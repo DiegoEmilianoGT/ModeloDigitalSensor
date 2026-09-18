@@ -4,9 +4,6 @@ Proyecto para Visual Studio Code con PlatformIO. Dos ESP32-C3 SuperMini, uno
 con un BME280 (I2C) y otro con un DHT22, cada uno se conecta a tu red Wi-Fi
 de 2.4 GHz y publica una página web con su lectura.
 
-> Grafana no se está usando por ahora. Prometheus sí: ver la sección
-> **Prometheus** más abajo.
-
 ## Conexiones
 
 | BME280 | ESP32-C3 SuperMini |
@@ -240,28 +237,3 @@ Además de la lógica de sensores y WiFi ya descrita:
   se reinicia solo antes de arriesgarse a un crash impredecible por falta de
   memoria — pensado para un nodo que corre semanas sin supervisión.
 
-## Problemas frecuentes
-
-- **`Failed to connect`**: mantén presionado `BOOT`, pulsa `Upload` y suelta
-  `BOOT` cuando empiece la conexión.
-- **Monitor serial vacío**: pulsa `RESET` después de abrirlo y verifica que el
-  cable USB transmita datos, no solo carga.
-- **`[BME280] No se encontro en 0x76 ni en 0x77`**: revisa que VCC esté en
-  3.3 V (no 5 V) y que SDA/SCL no estén invertidos.
-- **DHT22 sin lectura valida**: revisa la resistencia pull-up entre DATA y
-  VCC, que DATA este en GPIO4 (o el pin que hayas puesto en `PIN_DHT22`) y
-  que VCC este en 3.3 V.
-- **Una placa deja de responder cuando prendes/reflasheas la otra**: revisa
-  que cada una se haya compilado con su propio entorno (`esp32-c3-bme280` /
-  `esp32-c3-dht22`); si ambas comparten `NODO_ID` chocan en la red.
-- **Nunca se conecta y se reinicia en bucle**: casi siempre es que el router
-  está en 5 GHz o que el SSID lleva algún carácter distinto al escrito en
-  `secrets.h`.
-- **Se reinicia solo**: alimentación insuficiente. La Wi-Fi del ESP32-C3 tiene
-  picos de corriente; usa una fuente de al menos 500 mA.
-- **Target en `DOWN` en Prometheus**: confirma que `descubrir_nodos.sh
-  --loop` sigue corriendo (si se cerró la terminal, los archivos en
-  `prometheus/targets/` se quedan con la última IP conocida). Corre
-  `./descubrir_nodos.sh` una vez a mano para ver si encuentra la placa; si
-  dice "no encontrado", el problema es la placa/Wi-Fi, no Prometheus (ver
-  sección **Prometheus**).
