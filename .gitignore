@@ -1,0 +1,10 @@
+.pio/
+.vscode/
+.claude/
+__pycache__/
+include/secrets.h
+telegram-bot/.env
+*.log
+.DS_Store
+
+
