@@ -1,0 +1,37 @@
+groups:
+  - name: bme280
+    rules:
+      # El nodo dejo de responder
+      - alert: NodoCaido
+        expr: up{job="bme280"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          resumen: "El nodo {{ $labels.instance }} no responde"
+
+      # El nodo responde pero el BME280 no entrega lecturas
+      - alert: SensorSinLectura
+        expr: bme280_sensor_up == 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          resumen: "El BME280 no entrega datos"
+
+      # umbrales del firmware
+      - alert: CondicionFueraDeRango
+        expr: bme280_alert_active == 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          resumen: "Condiciones fuera de rango en {{ $labels.location }}"
+
+      - alert: SenalWiFiDebil
+        expr: bme280_wifi_rssi_dbm < -80
+        for: 10m
+        labels:
+          severity: info
+        annotations:
+          resumen: "Senal WiFi debil ({{ $value }} dBm)"

@@ -1,0 +1,15 @@
+[Unit]
+Description=Descubrimiento automatico de nodos ESP32-C3 para Prometheus
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=TOTO
+WorkingDirectory=/home/TOTO/DGTIC-RedAislada/RED-SENSORES/bme280-esp32c3/prometheus
+ExecStart=/usr/bin/bash /home/TOTO/DGTIC-RedAislada/RED-SENSORES/bme280-esp32c3/prometheus/descubrir_nodos.sh --loop 30
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

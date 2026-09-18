@@ -1,0 +1,16 @@
+[Unit]
+Description=Bot de Telegram para nodos ESP32-C3
+Wants=network-online.target
+After=network-online.target prometheus.service
+
+[Service]
+Type=simple
+User=TOTO
+WorkingDirectory=/home/TOTO/DGTIC-RedAislada/RED-SENSORES/bme280-esp32c3/telegram-bot
+EnvironmentFile=/etc/telegram-bot/telegram-bot.env
+ExecStart=/usr/bin/python3 /home/TOTO/DGTIC-RedAislada/RED-SENSORES/bme280-esp32c3/telegram-bot/bot.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

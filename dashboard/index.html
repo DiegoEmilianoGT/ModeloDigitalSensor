@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Monitor ambiental</title>
+<style>
+  :root {
+    --fondo: #f4f6f8;
+    --tarjeta: #ffffff;
+    --texto: #1c2530;
+    --texto-suave: #5b6b7c;
+    --borde: #e1e6eb;
+    --ok: #27ae60;
+    --mal: #e74c3c;
+    --acento: #2f6fed;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--fondo);
+    color: var(--texto);
+    font-family: -apple-system, Segoe UI, Arial, sans-serif;
+    padding: 24px 16px 60px;
+  }
+  h1 {
+    text-align: center;
+    font-size: 1.4em;
+    margin-bottom: 4px;
+  }
+  .subtitulo {
+    text-align: center;
+    color: var(--texto-suave);
+    font-size: 0.9em;
+    margin-bottom: 24px;
+  }
+  .config {
+    max-width: 640px;
+    margin: 0 auto 24px;
+    background: var(--tarjeta);
+    border: 1px solid var(--borde);
+    border-radius: 10px;
+    padding: 14px 18px;
+  }
+  .config summary {
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.9em;
+  }
+  .config-fila {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-top: 10px;
+    flex-wrap: wrap;
+  }
+  .config-fila label {
+    font-size: 0.85em;
+    color: var(--texto-suave);
+    min-width: 90px;
+  }
+  .config-fila input {
+    flex: 1;
+    min-width: 160px;
+    padding: 6px 8px;
+    border: 1px solid var(--borde);
+    border-radius: 6px;
+    font-size: 0.9em;
+  }
+  .config button {
+    margin-top: 12px;
+    padding: 7px 14px;
+    border: none;
+    border-radius: 6px;
+    background: var(--acento);
+    color: white;
+    font-size: 0.85em;
+    cursor: pointer;
+  }
+  .tarjetas {
+    max-width: 640px;
+    margin: 0 auto;
+    display: grid;
+    gap: 16px;
+  }
+  @media (min-width: 560px) {
+    .tarjetas { grid-template-columns: 1fr 1fr; }
+  }
+  .tarjeta {
+    background: var(--tarjeta);
+    border: 1px solid var(--borde);
+    border-radius: 12px;
+    padding: 18px;
+  }
+  .tarjeta-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+  .tarjeta-header h2 {
+    font-size: 1.05em;
+    margin: 0;
+  }
+  .estado {
+    font-size: 0.75em;
+    font-weight: 600;
+    padding: 3px 9px;
+    border-radius: 999px;
+    color: white;
+  }
+  .estado.ok { background: var(--ok); }
+  .estado.mal { background: var(--mal); }
+  .metricas {
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+  .metrica {
+    flex: 1;
+    min-width: 80px;
+  }
+  .metrica .valor {
+    font-size: 1.5em;
+    font-weight: 700;
+  }
+  .metrica .etiqueta {
+    font-size: 0.75em;
+    color: var(--texto-suave);
+  }
+  .pie {
+    margin-top: 12px;
+    font-size: 0.75em;
+    color: var(--texto-suave);
+  }
+</style>
+</head>
+<body>
+  <h1>Monitor ambiental</h1>
+  <p class="subtitulo">BME280 + DHT22 &mdash; se actualiza solo cada 3 s</p>
+
+  <details class="config">
+    <summary>Configurar direcciones IP</summary>
+    <div class="config-fila">
+      <label for="ipBme">IP BME280</label>
+      <input id="ipBme" type="text" placeholder="10.203.58.48">
+    </div>
+    <div class="config-fila">
+      <label for="ipDht">IP DHT22</label>
+      <input id="ipDht" type="text" placeholder="192.168.2.102">
+    </div>
+    <button id="guardar">Guardar</button>
+  </details>
+
+  <div class="tarjetas">
+    <div class="tarjeta" id="tarjetaBme">
+      <div class="tarjeta-header">
+        <h2>BME280</h2>
+        <span class="estado mal" id="estadoBme">sin datos</span>
+      </div>
+      <div class="metricas">
+        <div class="metrica">
+          <div class="valor" id="bmeTemp">&mdash;</div>
+          <div class="etiqueta">Temperatura &deg;C</div>
+        </div>
+        <div class="metrica">
+          <div class="valor" id="bmeHum">&mdash;</div>
+          <div class="etiqueta">Humedad %</div>
+        </div>
+        <div class="metrica">
+          <div class="valor" id="bmePres">&mdash;</div>
+          <div class="etiqueta">Presion hPa</div>
+        </div>
+      </div>
+      <div class="pie" id="bmePie">Sin conexion todavia.</div>
+    </div>
+
+    <div class="tarjeta" id="tarjetaDht">
+      <div class="tarjeta-header">
+        <h2>DHT22</h2>
+        <span class="estado mal" id="estadoDht">sin datos</span>
+      </div>
+      <div class="metricas">
+        <div class="metrica">
+          <div class="valor" id="dhtTemp">&mdash;</div>
+          <div class="etiqueta">Temperatura &deg;C</div>
+        </div>
+        <div class="metrica">
+          <div class="valor" id="dhtHum">&mdash;</div>
+          <div class="etiqueta">Humedad %</div>
+        </div>
+      </div>
+      <div class="pie" id="dhtPie">Sin conexion todavia.</div>
+    </div>
+  </div>
+
+<script>
+const IP_POR_DEFECTO = { bme: "10.203.58.48", dht: "192.168.2.102" };
+const INTERVALO_MS = 3000;
+
+function cargarIp(clave, porDefecto) {
+  try {
+    return localStorage.getItem(clave) || porDefecto;
+  } catch (e) {
+    return porDefecto;
+  }
+}
+
+function guardarIp(clave, valor) {
+  try {
+    localStorage.setItem(clave, valor);
+  } catch (e) {}
+}
+
+const ipBmeInput = document.getElementById("ipBme");
+const ipDhtInput = document.getElementById("ipDht");
+ipBmeInput.value = cargarIp("ip_bme280", IP_POR_DEFECTO.bme);
+ipDhtInput.value = cargarIp("ip_dht22", IP_POR_DEFECTO.dht);
+
+document.getElementById("guardar").addEventListener("click", () => {
+  guardarIp("ip_bme280", ipBmeInput.value.trim());
+  guardarIp("ip_dht22", ipDhtInput.value.trim());
+  actualizarTodo();
+});
+
+function horaLocal() {
+  return new Date().toLocaleTimeString();
+}
+
+async function actualizarTarjeta(ip, prefijo, sensorKey, camposExtra) {
+  const estadoEl = document.getElementById("estado" + prefijo);
+  const pieEl = document.getElementById(prefijo.toLowerCase() + "Pie");
+
+  if (!ip) {
+    estadoEl.textContent = "sin IP";
+    estadoEl.className = "estado mal";
+    pieEl.textContent = "Configura la IP arriba.";
+    return;
+  }
+
+  try {
+    const respuesta = await fetch(`http://${ip}/data`, { cache: "no-store" });
+    if (!respuesta.ok) throw new Error("HTTP " + respuesta.status);
+    const datos = await respuesta.json();
+    const sensor = datos[sensorKey];
+
+    if (!sensor || !sensor.valido) {
+      estadoEl.textContent = "sin lectura";
+      estadoEl.className = "estado mal";
+      pieEl.textContent = `${datos.node_id || ip} respondio, pero el sensor no tiene lectura valida (${horaLocal()}).`;
+      camposExtra.forEach(({ id }) => (document.getElementById(id).textContent = "—"));
+      return;
+    }
+
+    estadoEl.textContent = "en linea";
+    estadoEl.className = "estado ok";
+    camposExtra.forEach(({ id, campo }) => {
+      document.getElementById(id).textContent = sensor[campo] !== undefined ? sensor[campo].toFixed(1) : "—";
+    });
+    pieEl.textContent = `${datos.node_id || ip} &middot; actualizado ${horaLocal()}`;
+  } catch (err) {
+    estadoEl.textContent = "sin conexion";
+    estadoEl.className = "estado mal";
+    pieEl.textContent = `No se pudo contactar ${ip} (${horaLocal()}).`;
+  }
+}
+
+function actualizarTodo() {
+  actualizarTarjeta(ipBmeInput.value.trim(), "Bme", "bme280", [
+    { id: "bmeTemp", campo: "temperatura" },
+    { id: "bmeHum", campo: "humedad" },
+    { id: "bmePres", campo: "presion" },
+  ]);
+  actualizarTarjeta(ipDhtInput.value.trim(), "Dht", "dht22", [
+    { id: "dhtTemp", campo: "temperatura" },
+    { id: "dhtHum", campo: "humedad" },
+  ]);
+}
+
+actualizarTodo();
+setInterval(actualizarTodo, INTERVALO_MS);
+</script>
+</body>
+</html>

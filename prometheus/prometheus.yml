@@ -1,0 +1,21 @@
+global:
+  scrape_interval: 5s
+  scrape_timeout: 4s
+  evaluation_interval: 5s
+
+rule_files:
+  - "alertas_bme280.yml"
+
+scrape_configs:
+  # Targets sin IP fija: los genera prometheus/descubrir_nodos.sh en targets/*.json
+  - job_name: "bme280"
+    metrics_path: /metrics
+    file_sd_configs:
+      - files: ["targets/bme280.json"]
+        refresh_interval: 30s
+
+  - job_name: "dht22"
+    metrics_path: /metrics
+    file_sd_configs:
+      - files: ["targets/dht22.json"]
+        refresh_interval: 30s

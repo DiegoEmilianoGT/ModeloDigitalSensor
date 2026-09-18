@@ -1,0 +1,417 @@
+{
+  "title": "Gemelo Digital - Red de Sensores DGTIC",
+  "uid": "esp32c3-sensores",
+  "description": "Monitoreo en tiempo real de la red de nodos ESP32-C3 (BME280/DHT22) - Supercomputo DGTIC",
+  "tags": ["produccion", "sensores", "gemelo-digital"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 2,
+  "refresh": "5s",
+  "time": { "from": "now-6h", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "type": "datasource",
+        "query": "prometheus",
+        "label": "Fuente de datos",
+        "hide": 0,
+        "current": {},
+        "refresh": 1
+      },
+      {
+        "name": "nodo",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "${datasource}" },
+        "query": { "query": "label_values({__name__=~\".*_sensor_up\"}, location)", "refId": "nodo" },
+        "label": "Nodo",
+        "refresh": 2,
+        "multi": true,
+        "includeAll": true,
+        "current": { "text": "All", "value": ["$__all"] },
+        "sort": 1
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "text",
+      "gridPos": { "h": 3, "w": 24, "x": 0, "y": 0 },
+      "options": {
+        "mode": "markdown",
+        "content": "# Gemelo Digital — Red de Sensores Ambientales\n**DGTIC · Área de Supercómputo** — réplica en vivo de las condiciones físicas de cada nodo (temperatura, humedad, presión y conectividad). Usa el filtro **Nodo** arriba para enfocarte en un activo específico."
+      }
+    },
+    {
+      "id": 2,
+      "type": "row",
+      "title": "Estado y conectividad",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 3 },
+      "panels": []
+    },
+    {
+      "id": 3,
+      "title": "Nodo activo (up)",
+      "description": "Si Prometheus logra contactar al nodo por HTTP. CAIDO = sin respuesta de red.",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 4 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "up{job=~\"bme280|dht22\"}",
+          "legendFormat": "{{job}} ({{instance}})",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "type": "value", "options": { "0": { "text": "CAIDO", "color": "red" } } },
+            { "type": "value", "options": { "1": { "text": "OK", "color": "green" } } }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "green", "value": 1 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": { "colorMode": "background", "graphMode": "none", "textMode": "value_and_name" }
+    },
+    {
+      "id": 4,
+      "title": "Sensor con lectura valida",
+      "description": "Si el sensor fisico (BME280/DHT22) esta entregando datos coherentes, mas alla de si el nodo responde por red.",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 4 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "bme280_sensor_up{location=~\"$nodo\"}",
+          "legendFormat": "BME280 {{location}}",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "dht22_sensor_up{location=~\"$nodo\"}",
+          "legendFormat": "DHT22 {{location}}",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "type": "value", "options": { "0": { "text": "SIN LECTURA", "color": "red" } } },
+            { "type": "value", "options": { "1": { "text": "OK", "color": "green" } } }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "green", "value": 1 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": { "colorMode": "background", "graphMode": "none", "textMode": "value_and_name" }
+    },
+    {
+      "id": 5,
+      "title": "Alerta activa (BME280)",
+      "description": "Se activa cuando temperatura, humedad o presion salen de los umbrales configurados en el firmware.",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 4 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "bme280_alert_active{location=~\"$nodo\"}",
+          "legendFormat": "{{location}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "type": "value", "options": { "0": { "text": "Normal", "color": "green" } } },
+            { "type": "value", "options": { "1": { "text": "ALERTA", "color": "red" } } }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 1 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": { "colorMode": "background", "graphMode": "none", "textMode": "value_and_name" }
+    },
+    {
+      "id": 6,
+      "title": "Errores acumulados",
+      "description": "Lecturas invalidas acumuladas desde el ultimo arranque del nodo. Sube seguido = revisar cableado/sensor.",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 4 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "bme280_errores_total{location=~\"$nodo\"}",
+          "legendFormat": "BME280 {{location}}",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "dht22_errores_total{location=~\"$nodo\"}",
+          "legendFormat": "DHT22 {{location}}",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "options": { "colorMode": "none", "graphMode": "none", "textMode": "value_and_name" }
+    },
+    {
+      "id": 7,
+      "type": "row",
+      "title": "Condiciones ambientales - tiempo real",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 8 },
+      "panels": []
+    },
+    {
+      "id": 8,
+      "title": "Temperatura",
+      "type": "gauge",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 9 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "bme280_temperatura_celsius{location=~\"$nodo\"}",
+          "legendFormat": "BME280 {{location}}",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "dht22_temperatura_celsius{location=~\"$nodo\"}",
+          "legendFormat": "DHT22 {{location}}",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "celsius",
+          "min": -10,
+          "max": 45,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "green", "value": 10 },
+              { "color": "red", "value": 30 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": { "showThresholdLabels": false, "showThresholdMarkers": true }
+    },
+    {
+      "id": 9,
+      "title": "Humedad relativa",
+      "type": "gauge",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 7, "w": 8, "x": 8, "y": 9 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "bme280_humedad_porcentaje{location=~\"$nodo\"}",
+          "legendFormat": "BME280 {{location}}",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "dht22_humedad_porcentaje{location=~\"$nodo\"}",
+          "legendFormat": "DHT22 {{location}}",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "green", "value": 15 },
+              { "color": "red", "value": 65 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": { "showThresholdLabels": false, "showThresholdMarkers": true }
+    },
+    {
+      "id": 10,
+      "title": "Presion atmosferica (BME280)",
+      "type": "gauge",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 7, "w": 8, "x": 16, "y": 9 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "bme280_presion_hpa{location=~\"$nodo\"}",
+          "legendFormat": "{{location}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "pressurehpa",
+          "min": 650,
+          "max": 1100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "green", "value": 700 },
+              { "color": "red", "value": 1050 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": { "showThresholdLabels": false, "showThresholdMarkers": true }
+    },
+    {
+      "id": 11,
+      "type": "row",
+      "title": "Tendencias e historial",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 16 },
+      "panels": []
+    },
+    {
+      "id": 12,
+      "title": "Temperatura",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 17 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "bme280_temperatura_celsius{location=~\"$nodo\"}",
+          "legendFormat": "BME280 {{location}}",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "dht22_temperatura_celsius{location=~\"$nodo\"}",
+          "legendFormat": "DHT22 {{location}}",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "celsius",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "green", "value": 10 },
+              { "color": "red", "value": 30 }
+            ]
+          },
+          "custom": { "thresholdsStyle": { "mode": "dashed" } }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 13,
+      "title": "Humedad relativa",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 17 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "bme280_humedad_porcentaje{location=~\"$nodo\"}",
+          "legendFormat": "BME280 {{location}}",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "dht22_humedad_porcentaje{location=~\"$nodo\"}",
+          "legendFormat": "DHT22 {{location}}",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "percent", "min": 0, "max": 100 }, "overrides": [] }
+    },
+    {
+      "id": 14,
+      "title": "Presion atmosferica (BME280)",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 25 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "bme280_presion_hpa{location=~\"$nodo\"}",
+          "legendFormat": "{{location}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "pressurehpa" }, "overrides": [] }
+    },
+    {
+      "id": 15,
+      "title": "Senal WiFi (RSSI)",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 25 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "bme280_wifi_rssi_dbm{location=~\"$nodo\"}",
+          "legendFormat": "BME280 {{location}}",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "dht22_wifi_rssi_dbm{location=~\"$nodo\"}",
+          "legendFormat": "DHT22 {{location}}",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "dBm",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": -80 }
+            ]
+          },
+          "custom": { "thresholdsStyle": { "mode": "dashed" } }
+        },
+        "overrides": []
+      }
+    }
+  ]
+}
