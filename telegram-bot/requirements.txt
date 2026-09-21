@@ -1,1 +1,2 @@
-requests>=2.31
+requests>=2.25
+matplotlib>=3.5
