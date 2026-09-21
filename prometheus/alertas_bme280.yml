@@ -1,37 +1,76 @@
 groups:
-  - name: bme280
+  - name: nodos
     rules:
-      # El nodo dejo de responder
+      # El nodo dejo de responder (BME280 o DHT22)
       - alert: NodoCaido
-        expr: up{job="bme280"} == 0
+        expr: up{job=~"bme280|dht22"} == 0
         for: 2m
         labels:
           severity: critical
         annotations:
-          resumen: "El nodo {{ $labels.instance }} no responde"
+          resumen: "El nodo {{ $labels.job }} ({{ $labels.instance }}) no responde"
 
-      # El nodo responde pero el BME280 no entrega lecturas
+      # El nodo responde pero el sensor no entrega lecturas
       - alert: SensorSinLectura
-        expr: bme280_sensor_up == 0
+        expr: bme280_sensor_up == 0 or dht22_sensor_up == 0
         for: 2m
         labels:
           severity: warning
         annotations:
-          resumen: "El BME280 no entrega datos"
+          resumen: "El sensor no entrega lecturas validas"
 
-      # umbrales del firmware
-      - alert: CondicionFueraDeRango
-        expr: bme280_alert_active == 1
-        for: 5m
+      # Umbrales: mismos valores que ALERTA_* de include/config.h.
+      # Si cambias uno alla, cambialo aqui tambien (y el texto del resumen).
+      # keep_firing_for evita avisos repetidos cuando el valor oscila en el limite.
+      - alert: TemperaturaAlta
+        expr: bme280_temperatura_celsius > 30 or dht22_temperatura_celsius > 30
+        for: 1m
+        keep_firing_for: 2m
         labels:
           severity: warning
         annotations:
-          resumen: "Condiciones fuera de rango en {{ $labels.location }}"
+          resumen: '{{ $value | printf "%.1f" }} °C (maximo 30 °C)'
+
+      - alert: TemperaturaBaja
+        expr: bme280_temperatura_celsius < 10 or dht22_temperatura_celsius < 10
+        for: 1m
+        keep_firing_for: 2m
+        labels:
+          severity: warning
+        annotations:
+          resumen: '{{ $value | printf "%.1f" }} °C (minimo 10 °C)'
+
+      - alert: HumedadAlta
+        expr: bme280_humedad_porcentaje > 65 or dht22_humedad_porcentaje > 65
+        for: 1m
+        keep_firing_for: 2m
+        labels:
+          severity: warning
+        annotations:
+          resumen: '{{ $value | printf "%.1f" }} % (maximo 65 %)'
+
+      - alert: HumedadBaja
+        expr: bme280_humedad_porcentaje < 15 or dht22_humedad_porcentaje < 15
+        for: 1m
+        keep_firing_for: 2m
+        labels:
+          severity: warning
+        annotations:
+          resumen: '{{ $value | printf "%.1f" }} % (minimo 15 %)'
+
+      - alert: PresionFueraDeRango
+        expr: bme280_presion_hpa > 1050 or bme280_presion_hpa < 700
+        for: 1m
+        keep_firing_for: 2m
+        labels:
+          severity: warning
+        annotations:
+          resumen: '{{ $value | printf "%.0f" }} hPa (rango 700 a 1050 hPa)'
 
       - alert: SenalWiFiDebil
-        expr: bme280_wifi_rssi_dbm < -80
+        expr: bme280_wifi_rssi_dbm < -80 or dht22_wifi_rssi_dbm < -80
         for: 10m
         labels:
           severity: info
         annotations:
-          resumen: "Senal WiFi debil ({{ $value }} dBm)"
+          resumen: "Senal de {{ $value }} dBm"

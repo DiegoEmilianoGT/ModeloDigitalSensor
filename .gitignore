@@ -4,6 +4,7 @@
 __pycache__/
 include/secrets.h
 telegram-bot/.env
+telegram-bot/.env.example
 *.log
 .DS_Store
 
