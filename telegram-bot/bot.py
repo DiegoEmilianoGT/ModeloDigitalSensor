@@ -129,7 +129,7 @@ TECLADO_MENU = {"inline_keyboard": [
     [boton("Estado", "cmd:estado"), boton("Alertas", "cmd:alertas")],
     [boton("Temperatura", "cmd:temp"), boton("Humedad", "cmd:humedad")],
     [boton("Presion", "cmd:presion"), boton("Senal WiFi", "cmd:rssi")],
-] + FILAS_GRAFICAS + [
+    [boton("Graficas", "cmd:grafica")],
     [boton("Silenciar alertas", "cmd:silenciar"), boton("Activar alertas", "cmd:activar")],
 ]}
 
@@ -582,4 +582,3 @@ def bucle_principal():
 
 if __name__ == "__main__":
     bucle_principal()
-
