@@ -94,7 +94,6 @@ void handleRoot() {
   }
 #endif
 
-
   html += F("<p>IP: ");
   html += WiFi.localIP().toString();
   html += F(" | RSSI: ");
@@ -143,7 +142,6 @@ void handleData() {
   json += "}";
 #endif
 
-
   json += "}";
   server.send(200, "application/json", json);
 }
@@ -178,7 +176,6 @@ void handleMetrics() {
   agregarMetrica(out, "dht22_errores_total",
     "Lecturas invalidas del DHT22 acumuladas desde que arranco el nodo.", dht22.errorCount());
 #endif
-
 
   server.send(200, "text/plain; version=0.0.4; charset=utf-8", out);
 }

@@ -9,8 +9,6 @@ public:
   void update();
 
   bool isValid() const { return valid_; }
-  bool isAvailable() const { return available_; }
-  uint8_t address() const { return address_; }
   uint32_t errorCount() const { return errorCount_; }
 
   float temperature() const { return temperature_; }

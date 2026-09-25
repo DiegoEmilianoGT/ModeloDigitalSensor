@@ -4,29 +4,6 @@ Proyecto para Visual Studio Code con PlatformIO. Dos ESP32-C3 SuperMini, uno
 con un BME280 (I2C) y otro con un DHT22, cada uno se conecta a tu red Wi-Fi
 de 2.4 GHz y publica una página web con su lectura.
 
-## Conexiones
-
-| BME280 | ESP32-C3 SuperMini |
-| --- | --- |
-| VCC/VIN | 3.3 V |
-| GND | GND |
-| SDA | GPIO 8 |
-| SCL | GPIO 9 |
-
-| DHT22 | ESP32-C3 SuperMini |
-| --- | --- |
-| VCC | 3.3 V |
-| GND | GND |
-| DATA | GPIO 4 |
-
-El DHT22 pelado (sin PCB) necesita una resistencia externa de 4.7k–10kΩ entre
-DATA y VCC; sin ella la lectura siempre falla. El BME280 no necesita nada
-extra: el programa prueba solo las direcciones I2C `0x76` y `0x77`.
-
-> **Si la placa no arranca o `Upload` falla con el BME280 conectado:** GPIO 8 y
-> GPIO 9 también son pines de arranque del ESP32-C3. Cambia `PIN_I2C_SDA` a 5 y
-> `PIN_I2C_SCL` a 6 en `include/config.h`, y recablea SDA/SCL a esos pines.
-
 ## Dos placas, un firmware
 
 Cada sensor vive en su propio ESP32-C3, así que `platformio.ini` define un
@@ -110,11 +87,11 @@ cercanos a 0 son mejor señal (p. ej. -50 dBm es buena, -80 dBm es débil).
 
 - `http://IP_DEL_ESP32/` — lectura del sensor de esa placa y estado (para verla
   en el navegador).
-- `http://IP_DEL_ESP32/data` — la misma lectura en JSON, para el dashboard.
+- `http://IP_DEL_ESP32/data` — la misma lectura en JSON.
 - `http://IP_DEL_ESP32/metrics` — la misma lectura en formato Prometheus, para
   que Prometheus la scrapee (ver sección **Prometheus**).
 
-## IP y dashboard
+## IP
 
 Cada placa obtiene su IP por DHCP del router (no hay IP fija configurada). Al
 conectarse, el nodo consulta `WiFi.localIP()` y la imprime por el Serial
@@ -124,18 +101,6 @@ qué IP le asignó la red cada vez que arranque.
 Si necesitas que la IP no cambie entre reinicios, resérvala desde el propio
 router (DHCP reservation / IP estática por MAC) en vez de configurarla en el
 firmware.
-
-`dashboard/index.html` es una página local (no un sitio en internet) que junta
-las lecturas de las dos placas en una sola vista, consultando `/data` de cada
-una cada 3 segundos. Para usarla:
-
-1. Abre `dashboard/index.html` haciendo doble clic (se abre en tu navegador).
-2. Si tus IPs no son las de por defecto, despliega **Configurar direcciones
-   IP**, escríbelas y dale a **Guardar** (queda guardado en ese navegador).
-
-Si el navegador bloquea las peticiones por CORS al abrir el archivo así,
-sírvelo con un servidor local en vez de abrirlo directo, por ejemplo desde esa
-carpeta: `python -m http.server 8000` y entra a `http://localhost:8000/`.
 
 ## Prometheus
 
