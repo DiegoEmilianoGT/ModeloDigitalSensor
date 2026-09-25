@@ -9,6 +9,7 @@ import os
 import re
 import tempfile
 import time
+import csv
 from datetime import datetime
 
 import requests
@@ -29,7 +30,9 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 log = logging.getLogger("telegram-bot")
 
 BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
-ALLOWED_CHAT_IDS = {c.strip() for c in os.environ["TELEGRAM_ALLOWED_CHAT_IDS"].split(",") if c.strip()}
+ADMIN_CHAT_IDS = {c.strip() for c in os.environ["TELEGRAM_ALLOWED_CHAT_IDS"].split(",") if c.strip()}
+USUARIOS_PATH = os.environ.get("TELEGRAM_USERS_FILE",
+                                os.path.join(os.path.dirname(os.path.abspath(__file__)), "usuarios.json"))
 PROMETHEUS_URL = os.environ.get("PROMETHEUS_URL", "http://localhost:9090")
 CHECK_INTERVAL_SEC = int(os.environ.get("CHECK_INTERVAL_SEC", "30"))
 ALERT_COOLDOWN_SEC = int(os.environ.get("ALERT_COOLDOWN_SEC", "300"))
@@ -87,16 +90,23 @@ def sin_token(exc):
 
 # Telegram
 
+SESION = requests.Session()  # reutiliza la conexion HTTPS: ~340 ms menos por llamada
+
+
 def telegram(metodo, timeout=15, **kwargs):
     try:
-        resp = requests.post(f"{API_BASE}/{metodo}", timeout=timeout, **kwargs)
+        resp = SESION.post(f"{API_BASE}/{metodo}", timeout=timeout, **kwargs)
     except requests.RequestException as exc:
         log.warning("Telegram %s: %s", metodo, sin_token(exc))
         return None
     if not resp.ok:
         log.warning("Telegram %s fallo: %s %s", metodo, resp.status_code, resp.text[:200])
         return None
-    return resp.json()
+    try:
+        return resp.json()
+    except ValueError:
+        log.warning("Telegram %s devolvio algo que no es JSON", metodo)
+        return None
 
 
 def enviar_mensaje(chat_id, texto, teclado=None):
@@ -111,8 +121,25 @@ def enviar_mensaje(chat_id, texto, teclado=None):
     telegram("sendMessage", json=payload)
 
 
+def enviar_archivo(chat_id, metodo, campo, nombre, contenido, tipo, pie):
+    """Sube una foto o un documento; si Telegram no lo recibe, se lo dice al usuario."""
+    respuesta = telegram(
+        metodo,
+        timeout=60,
+        data={"chat_id": chat_id, "caption": pie, "parse_mode": "HTML"},
+        files={campo: (nombre, contenido, tipo)},
+    )
+    if respuesta is None:
+        enviar_mensaje(chat_id, "No se pudo enviar el archivo, intenta de nuevo.")
+
+
 def avisar_a_todos(texto, teclado=None):
-    for chat_id in ALLOWED_CHAT_IDS:
+    for chat_id in usuarios_autorizados():
+        enviar_mensaje(chat_id, texto, teclado)
+
+
+def avisar_a_admins(texto, teclado=None):
+    for chat_id in ADMIN_CHAT_IDS:
         enviar_mensaje(chat_id, texto, teclado)
 
 
@@ -134,45 +161,168 @@ TECLADO_MENU = {"inline_keyboard": [
 ]}
 
 
+# Usuarios (solicitud y aprobacion de acceso)
+
+def cargar_usuarios():
+    try:
+        with open(USUARIOS_PATH, encoding="utf-8") as f:
+            datos = json.load(f)
+    except FileNotFoundError:
+        return {"aprobados": {}, "pendientes": {}}
+    except (json.JSONDecodeError, OSError) as exc:
+        log.warning("No se pudo leer %s: %s", USUARIOS_PATH, exc)
+        return {"aprobados": {}, "pendientes": {}}
+    datos.setdefault("aprobados", {})
+    datos.setdefault("pendientes", {})
+    return datos
+
+
+def guardar_usuarios(datos):
+    tmp = USUARIOS_PATH + ".tmp"
+    try:
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(datos, f, ensure_ascii=False, indent=2)
+        os.replace(tmp, USUARIOS_PATH)
+    except OSError as exc:
+        log.warning("No se pudo guardar %s: %s", USUARIOS_PATH, exc)
+
+
+usuarios = cargar_usuarios()
+
+
+def usuarios_autorizados():
+    return ADMIN_CHAT_IDS | set(usuarios["aprobados"])
+
+
+def tiene_acceso(chat_id):
+    return chat_id in usuarios_autorizados()
+
+
+def es_admin(chat_id):
+    return chat_id in ADMIN_CHAT_IDS
+
+
+def nombre_de(persona):
+    nombre = " ".join(p for p in [persona.get("first_name"), persona.get("last_name")] if p)
+    usuario = f"@{persona['username']}" if persona.get("username") else ""
+    return " ".join(p for p in [nombre, usuario] if p) or "sin nombre"
+
+
+def comando_solicitar(chat_id, persona):
+    if tiene_acceso(chat_id):
+        enviar_mensaje(chat_id, "Ya tienes acceso. Escribe /menu para empezar.")
+        return
+    if chat_id in usuarios["pendientes"]:
+        enviar_mensaje(chat_id, "Tu solicitud ya esta pendiente de revision.")
+        return
+    usuarios["pendientes"][chat_id] = {
+        "nombre": nombre_de(persona),
+        "fecha": datetime.now().astimezone().isoformat(),
+    }
+    guardar_usuarios(usuarios)
+    enviar_mensaje(chat_id, "Solicitud enviada. Te aviso en cuanto la revisen.")
+    teclado = {"inline_keyboard": [[
+        boton("Aprobar", f"acc:aprobar:{chat_id}"),
+        boton("Rechazar", f"acc:rechazar:{chat_id}"),
+    ]]}
+    avisar_a_admins(
+        f"<b>Solicitud de acceso</b>\n{SANGRIA}{esc(usuarios['pendientes'][chat_id]['nombre'])}\n{SANGRIA}ID {esc(chat_id)}",
+        teclado,
+    )
+
+
+def resolver_solicitud(admin_id, chat_id, aprobar):
+    if not es_admin(admin_id):
+        return "No tienes permiso para hacer esto."
+    pendiente = usuarios["pendientes"].pop(chat_id, None)
+    if pendiente is None:
+        return "Esa solicitud ya fue resuelta."
+    if aprobar:
+        usuarios["aprobados"][chat_id] = {
+            "nombre": pendiente["nombre"],
+            "aprobado_por": admin_id,
+            "fecha": datetime.now().astimezone().isoformat(),
+        }
+        guardar_usuarios(usuarios)
+        actualizar_comandos_de(chat_id)
+        enviar_mensaje(chat_id, "Tu acceso fue aprobado. Escribe /menu para empezar.")
+        return f"Aprobado: {pendiente['nombre']}"
+    guardar_usuarios(usuarios)
+    enviar_mensaje(chat_id, "Tu solicitud de acceso fue rechazada.")
+    return f"Rechazado: {pendiente['nombre']}"
+
+
+def comando_usuarios(chat_id):
+    if not es_admin(chat_id):
+        enviar_mensaje(chat_id, "No tienes permiso para ver esto.")
+        return
+    filas = [(info["nombre"], f"ID {cid}") for cid, info in usuarios["aprobados"].items()]
+    filas += [(info["nombre"], f"ID {cid} (pendiente)") for cid, info in usuarios["pendientes"].items()]
+    if not filas:
+        enviar_mensaje(chat_id, "No hay usuarios aprobados ni solicitudes pendientes.")
+        return
+    enviar_mensaje(chat_id, bloque("Usuarios", filas))
+
+
+def comando_revocar(chat_id, args):
+    if not es_admin(chat_id):
+        enviar_mensaje(chat_id, "No tienes permiso para hacer esto.")
+        return
+    if not args:
+        enviar_mensaje(chat_id, "Uso: /revocar <ID> (mira los ID con /usuarios)")
+        return
+    objetivo = args[0]
+    if usuarios["aprobados"].pop(objetivo, None) is None:
+        enviar_mensaje(chat_id, f"El ID {objetivo} no estaba aprobado.")
+        return
+    guardar_usuarios(usuarios)
+    actualizar_comandos_de(objetivo)
+    enviar_mensaje(chat_id, f"Acceso revocado para el ID {objetivo}.")
+    enviar_mensaje(objetivo, "Tu acceso a este bot fue revocado.")
+
+
 # Prometheus
 
+ERRORES_PROM = (requests.RequestException, ValueError, KeyError)
+
+
+def prom_get(ruta, timeout=10, **params):
+    """GET a la API de Prometheus. Lanza ValueError con el mensaje de Prometheus si algo falla."""
+    resp = requests.get(f"{PROMETHEUS_URL}/api/v1/{ruta}", params=params, timeout=timeout)
+    try:
+        cuerpo = resp.json()
+    except ValueError:
+        resp.raise_for_status()
+        raise
+    if cuerpo.get("status") != "success":
+        raise ValueError(cuerpo.get("error", f"HTTP {resp.status_code}"))
+    return cuerpo["data"]
+
+
 def prom_query(expr):
-    resp = requests.get(f"{PROMETHEUS_URL}/api/v1/query", params={"query": expr}, timeout=10)
-    resp.raise_for_status()
-    data = resp.json()
-    if data.get("status") != "success":
-        return []
-    return data["data"]["result"]
+    return prom_get("query", query=expr)["result"]
 
 
 def prom_alertas():
-    resp = requests.get(f"{PROMETHEUS_URL}/api/v1/alerts", timeout=10)
-    resp.raise_for_status()
-    return resp.json()["data"]["alerts"]
+    return prom_get("alerts")["alerts"]
 
 
 def leer_todo():
     """Devuelve ({location: {metrica: valor}}, {job: up})."""
-    lecturas = {}
+    lecturas, jobs_up = {}, {}
     try:
-        resultados = prom_query('{__name__=~"(bme280|dht22)_.+"}')
-    except requests.RequestException as exc:
+        for r in prom_query('{__name__=~"(bme280|dht22)_.+"}'):
+            metrica = r["metric"].get("__name__")
+            if metrica in ETIQUETAS:
+                location = r["metric"].get("location", "desconocido")
+                lecturas.setdefault(location, {})[metrica] = float(r["value"][1])
+    except ERRORES_PROM as exc:
         log.warning("No se pudieron consultar las metricas: %s", exc)
-        resultados = []
-    for r in resultados:
-        metrica = r["metric"].get("__name__")
-        if metrica not in ETIQUETAS:
-            continue
-        location = r["metric"].get("location", "desconocido")
-        lecturas.setdefault(location, {})[metrica] = float(r["value"][1])
-
-    jobs_up = {}
     try:
         for r in prom_query('up{job=~"bme280|dht22"}'):
             jobs_up[r["metric"].get("job", "?")] = float(r["value"][1])
-    except requests.RequestException as exc:
+    except ERRORES_PROM as exc:
         log.warning("No se pudo consultar up: %s", exc)
-
     return lecturas, jobs_up
 
 
@@ -184,7 +334,12 @@ def formatear_estado():
         return "No se pudo contactar a Prometheus. Revisa que el servicio este activo."
 
     partes = []
-    
+    if jobs_up:
+        partes.append(bloque("Conexion", [
+            (job.upper(), "en linea" if valor == 1 else "SIN RESPUESTA")
+            for job, valor in sorted(jobs_up.items())
+        ]))
+
     for location in sorted(lecturas):
         filas = []
         for metrica, (nombre, unidad) in ETIQUETAS.items():
@@ -220,8 +375,8 @@ def formatear_metrica(clave):
 
 # Alertas
 
-estado_alertas = {}  
-ultimo_aviso = {}     
+estado_alertas = {}
+ultimo_aviso = {}
 alertas_silenciadas = False
 alertas_inicializadas = False
 
@@ -311,7 +466,7 @@ def estado_silencio():
 def formatear_alertas():
     try:
         activas = [info_alerta(a) for a in prom_alertas()]
-    except (requests.RequestException, ValueError, KeyError) as exc:
+    except ERRORES_PROM as exc:
         log.warning("No se pudo consultar las alertas: %s", exc)
         return "No se pudo contactar a Prometheus."
     cuerpo = "\n\n".join(
@@ -325,7 +480,7 @@ def revisar_alertas():
     global alertas_inicializadas
     try:
         crudas = prom_alertas()
-    except (requests.RequestException, ValueError, KeyError) as exc:
+    except ERRORES_PROM as exc:
         log.warning("No se pudo consultar las alertas: %s", exc)
         return  # Prometheus no respondio: no asumir que se resolvieron
 
@@ -383,13 +538,7 @@ def generar_grafica(clave, rango):
     segundos = RANGOS[rango]
     fin = time.time()
     paso = max(15, segundos // 300)
-    resp = requests.get(
-        f"{PROMETHEUS_URL}/api/v1/query_range",
-        params={"query": consulta, "start": fin - segundos, "end": fin, "step": paso},
-        timeout=20,
-    )
-    resp.raise_for_status()
-    series = resp.json()["data"]["result"]
+    series = prom_get("query_range", timeout=20, query=consulta, start=fin - segundos, end=fin, step=paso)["result"]
     if not series:
         return None, []
 
@@ -439,20 +588,70 @@ def enviar_grafica(chat_id, clave, rango):
         return
     try:
         png, resumen = generar_grafica(clave, rango)
-    except (requests.RequestException, ValueError, KeyError) as exc:
+    except ERRORES_PROM as exc:
         log.warning("No se pudo generar la grafica: %s", exc)
         enviar_mensaje(chat_id, "No se pudo generar la grafica (Prometheus no respondio).")
         return
     if png is None:
         enviar_mensaje(chat_id, "Sin datos para ese rango.")
         return
-    pie = bloque(f"{GRAFICAS[clave][0]} - ultimas {rango}", resumen)
-    telegram(
-        "sendPhoto",
-        timeout=30,
-        data={"chat_id": chat_id, "caption": pie, "parse_mode": "HTML"},
-        files={"photo": ("grafica.png", png, "image/png")},
-    )
+    pie = bloque(f"{GRAFICAS[clave][0]}- ultimas {rango}", resumen)
+    enviar_archivo(chat_id, "sendPhoto", "photo", "grafica.png", png, "image/png", pie)
+
+
+# CSV: creacion y envio
+
+CSV_DIAS = 7
+CSV_PASO = 15  # segundos entre filas
+CSV_VENTANA = CSV_PASO * 10_000  # Prometheus rechaza mas de 11,000 puntos por consulta: se pide por bloques
+CSV_METRICAS = (
+    "bme280_temperatura_celsius", "bme280_humedad_porcentaje", "bme280_presion_hpa",
+    "dht22_temperatura_celsius", "dht22_humedad_porcentaje",
+)
+
+
+def armar_csv():
+    consulta = '{__name__=~"%s"}' % "|".join(CSV_METRICAS)
+    fin = int(time.time())
+    inicio = fin - CSV_DIAS * 24 * 3600
+    filas = {}  # filas[timestamp] = {"nombre_columna": "valor", ...}
+    columnas = set()
+
+    for desde in range(inicio, fin, CSV_VENTANA):
+        hasta = min(desde + CSV_VENTANA, fin)
+        series = prom_get("query_range", timeout=20, query=consulta, start=desde, end=hasta, step=CSV_PASO)["result"]
+        for s in series:
+            nombre, unidad = ETIQUETAS[s["metric"]["__name__"]]
+            columna = f"{acortar(s['metric'].get('location', '?'))} - {nombre} ({unidad})"
+            columnas.add(columna)
+            for t, v in s["values"]:
+                filas.setdefault(int(t), {})[columna] = v
+
+    if not filas:
+        return None
+
+    buffer = io.StringIO()
+    writer = csv.DictWriter(buffer, fieldnames=["Times"] + sorted(columnas), restval="")
+    writer.writeheader()
+    for ts in sorted(filas):
+        writer.writerow({"Times": datetime.fromtimestamp(ts).strftime("%Y-%m-%d %H:%M:%S"), **filas[ts]})
+    return buffer.getvalue().encode("utf-8-sig")  # con BOM: Excel muestra bien el "°"
+
+
+def exportar_csv(chat_id):
+    enviar_mensaje(chat_id, f"Generando CSV de los ultimos {CSV_DIAS} dias")
+    try:
+        contenido = armar_csv()
+    except ERRORES_PROM as exc:
+        log.warning("No se pudo generar CSV: %s", exc)
+        enviar_mensaje(chat_id, "No se pudo generar el CSV (Prometheus no respondio).")
+        return
+    if contenido is None:
+        enviar_mensaje(chat_id, "No hay datos para generar CSV.")
+        return
+    nombre = f"sensores_{datetime.now():%Y-%m-%d}.csv"
+    pie = f"Datos de sensores: ultimos {CSV_DIAS} dias (1 fila cada {CSV_PASO} s)"
+    enviar_archivo(chat_id, "sendDocument", "document", nombre, contenido, "text/csv", pie)
 
 
 # Comandos
@@ -464,8 +663,14 @@ AYUDA = (
     "/alertas - alertas activas\n"
     "/temp /humedad /presion /rssi - lecturas actuales\n"
     "/grafica temp|hum|pres 1h|6h|24h\n"
+    f"/csv - exporta los ultimos {CSV_DIAS} dias en CSV\n"
     "/silenciar - pausa los avisos\n"
     "/activar - reanuda los avisos"
+)
+
+SIN_ACCESO = (
+    "No tienes acceso a este bot.\n"
+    "Escribe /solicitar para pedirlo; un administrador lo debe aprobar."
 )
 
 COMANDOS_BOT = [
@@ -477,8 +682,15 @@ COMANDOS_BOT = [
     ("presion", "Presion actual"),
     ("rssi", "Senal WiFi actual"),
     ("grafica", "Grafica"),
+    ("csv", "Exportar datos a CSV"),
     ("silenciar", "Silenciar avisos"),
     ("activar", "Reanudar avisos"),
+]
+
+COMANDOS_PUBLICOS = [("solicitar", "Pedir acceso al bot")]
+COMANDOS_ADMIN = [
+    ("usuarios", "Ver usuarios y solicitudes"),
+    ("revocar", "Quitar el acceso a alguien"),
 ]
 
 
@@ -494,10 +706,16 @@ def ejecutar(chat_id, accion, args):
             enviar_grafica(chat_id, args[0].lower(), args[1].lower())
         else:
             enviar_mensaje(chat_id, MENSAJE_GRAFICAS, TECLADO_GRAFICAS)
+    elif accion == "csv":
+        exportar_csv(chat_id)
     elif accion == "silenciar":
         comando_silenciar(chat_id)
     elif accion == "activar":
         comando_activar(chat_id)
+    elif accion == "usuarios":
+        comando_usuarios(chat_id)
+    elif accion == "revocar":
+        comando_revocar(chat_id, args)
     else:
         enviar_mensaje(chat_id, AYUDA, TECLADO_MENU)
 
@@ -522,11 +740,20 @@ def procesar_update(update):
     cb = update.get("callback_query")
     if cb:
         chat_id = str(cb.get("message", {}).get("chat", {}).get("id", ""))
-        if chat_id not in ALLOWED_CHAT_IDS:
+        data = cb.get("data", "")
+
+        if data.startswith("acc:"):
+            _, decision, objetivo = data.split(":", 2)
+            log.info("%s resuelve solicitud de %s: %s", chat_id, objetivo, decision)
+            texto = resolver_solicitud(chat_id, objetivo, decision == "aprobar")
+            telegram("answerCallbackQuery", json={"callback_query_id": cb["id"], "text": texto})
+            return
+
+        telegram("answerCallbackQuery", json={"callback_query_id": cb["id"]})
+        if not tiene_acceso(chat_id):
             log.info("Boton ignorado de chat no autorizado: %s", chat_id)
             return
-        telegram("answerCallbackQuery", json={"callback_query_id": cb["id"]})
-        accion, args = accion_de_callback(cb.get("data", ""))
+        accion, args = accion_de_callback(data)
         log.info("Boton de %s: %s %s", chat_id, accion, args)
         ejecutar(chat_id, accion, args)
         return
@@ -535,21 +762,45 @@ def procesar_update(update):
     if not mensaje or "text" not in mensaje:
         return
     chat_id = str(mensaje["chat"]["id"])
-    if chat_id not in ALLOWED_CHAT_IDS:
-        log.info("Mensaje ignorado de chat no autorizado: %s", chat_id)
-        return
     accion, args = parsear_comando(mensaje["text"])
+
+    if not tiene_acceso(chat_id):
+        if accion == "solicitar":
+            comando_solicitar(chat_id, mensaje.get("from", {}))
+        else:
+            log.info("Mensaje ignorado de chat no autorizado: %s", chat_id)
+            enviar_mensaje(chat_id, SIN_ACCESO)
+        return
+
     log.info("Comando de %s: %s %s", chat_id, accion, args)
     ejecutar(chat_id, accion, args)
 
 
+def comandos_para(chat_id):
+    if es_admin(chat_id):
+        return COMANDOS_BOT + COMANDOS_ADMIN
+    if chat_id in usuarios["aprobados"]:
+        return COMANDOS_BOT
+    return COMANDOS_PUBLICOS
+
+
+def actualizar_comandos_de(chat_id):
+    telegram("setMyCommands", json={
+        "commands": [{"command": c, "description": d} for c, d in comandos_para(chat_id)],
+        "scope": {"type": "chat", "chat_id": chat_id},
+    })
+
+
 def registrar_comandos():
     telegram("setMyCommands", json={
-        "commands": [{"command": c, "description": d} for c, d in COMANDOS_BOT]})
+        "commands": [{"command": c, "description": d} for c, d in COMANDOS_PUBLICOS]})
+    for chat_id in usuarios_autorizados():
+        actualizar_comandos_de(chat_id)
 
 
 def bucle_principal():
-    log.info("Bot iniciado. Chats permitidos: %s", ALLOWED_CHAT_IDS)
+    log.info("Bot iniciado. Administradores: %s", ADMIN_CHAT_IDS)
+    log.info("Usuarios aprobados: %s", list(usuarios["aprobados"]))
     if not GRAFICAS_OK:
         log.warning("matplotlib no esta instalado: /grafica deshabilitado")
     registrar_comandos()
