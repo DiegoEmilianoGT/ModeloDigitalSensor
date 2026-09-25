@@ -602,8 +602,8 @@ def enviar_grafica(chat_id, clave, rango):
 # CSV: creacion y envio
 
 CSV_DIAS = 7
-CSV_PASO = 15  # segundos entre filas
-CSV_VENTANA = CSV_PASO * 10_000  # Prometheus rechaza mas de 11,000 puntos por consulta: se pide por bloques
+CSV_PASO = 15  
+CSV_VENTANA = CSV_PASO * 10_000  # Prometheus se pide por bloques
 CSV_METRICAS = (
     "bme280_temperatura_celsius", "bme280_humedad_porcentaje", "bme280_presion_hpa",
     "dht22_temperatura_celsius", "dht22_humedad_porcentaje",
@@ -614,7 +614,7 @@ def armar_csv():
     consulta = '{__name__=~"%s"}' % "|".join(CSV_METRICAS)
     fin = int(time.time())
     inicio = fin - CSV_DIAS * 24 * 3600
-    filas = {}  # filas[timestamp] = {"nombre_columna": "valor", ...}
+    filas = {}  
     columnas = set()
 
     for desde in range(inicio, fin, CSV_VENTANA):
@@ -635,7 +635,7 @@ def armar_csv():
     writer.writeheader()
     for ts in sorted(filas):
         writer.writerow({"Times": datetime.fromtimestamp(ts).strftime("%Y-%m-%d %H:%M:%S"), **filas[ts]})
-    return buffer.getvalue().encode("utf-8-sig")  # con BOM: Excel muestra bien el "°"
+    return buffer.getvalue().encode("utf-8-sig")  # Excel muestra bien el "°"
 
 
 def exportar_csv(chat_id):
