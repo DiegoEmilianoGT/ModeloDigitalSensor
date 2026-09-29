@@ -20,9 +20,9 @@
 #define REINTENTO_BME_MS      10000UL
 #define ERRORES_PARA_REINICIAR_BME 5
 
-#define DHT22_INTERVALO_MS 3000UL  // piso de hardware del DHT22 es 2s
+#define DHT22_INTERVALO_MS 3000UL  
 
-#define HEAP_MINIMO_BYTES 20000UL  // reinicia el nodo si el heap cae por debajo
+#define HEAP_MINIMO_BYTES 20000UL 
 
 // Umbrales de alerta (BME280)
 #define ALERTA_TEMP_MAX       30.0f

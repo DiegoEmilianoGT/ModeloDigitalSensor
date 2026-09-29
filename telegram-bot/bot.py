@@ -1,6 +1,3 @@
-#!/usr/bin/env python3
-"""Bot de Telegram para consultar y vigilar los nodos via Prometheus."""
-
 import html
 import io
 import json
@@ -44,14 +41,11 @@ ETIQUETAS = {
     "bme280_temperatura_celsius": ("Temperatura", "°C"),
     "bme280_humedad_porcentaje": ("Humedad", "%"),
     "bme280_presion_hpa": ("Presion", "hPa"),
-    "bme280_alert_active": ("Alerta", None),
     "bme280_wifi_rssi_dbm": ("RSSI", "dBm"),
-    "bme280_errores_total": ("Errores", ""),
     "dht22_sensor_up": ("Sensor", None),
     "dht22_temperatura_celsius": ("Temperatura", "°C"),
     "dht22_humedad_porcentaje": ("Humedad", "%"),
-    "dht22_wifi_rssi_dbm": ("RSSI", "dBm"),
-    "dht22_errores_total": ("Errores", ""),
+    "dht22_wifi_rssi_dbm": ("RSSI", "dBm")
 }
 
 GRAFICAS = {
@@ -346,9 +340,7 @@ def formatear_estado():
             if metrica not in lecturas[location]:
                 continue
             valor = lecturas[location][metrica]
-            if metrica.endswith("_active"):
-                texto = "ALERTA" if valor == 1 else "normal"
-            elif metrica.endswith("_up"):
+            if metrica.endswith("_up"):
                 texto = "En linea" if valor == 1 else "SIN RESPUESTA"
             elif metrica.endswith("_total"):
                 texto = f"{valor:.0f}"
@@ -602,8 +594,8 @@ def enviar_grafica(chat_id, clave, rango):
 # CSV: creacion y envio
 
 CSV_DIAS = 7
-CSV_PASO = 15  # segundos entre filas
-CSV_VENTANA = CSV_PASO * 10_000  # Prometheus rechaza mas de 11,000 puntos por consulta: se pide por bloques
+CSV_PASO = 15  
+CSV_VENTANA = CSV_PASO * 10_000  # Prometheus se pide por bloques
 CSV_METRICAS = (
     "bme280_temperatura_celsius", "bme280_humedad_porcentaje", "bme280_presion_hpa",
     "dht22_temperatura_celsius", "dht22_humedad_porcentaje",
@@ -614,7 +606,7 @@ def armar_csv():
     consulta = '{__name__=~"%s"}' % "|".join(CSV_METRICAS)
     fin = int(time.time())
     inicio = fin - CSV_DIAS * 24 * 3600
-    filas = {}  # filas[timestamp] = {"nombre_columna": "valor", ...}
+    filas = {}  
     columnas = set()
 
     for desde in range(inicio, fin, CSV_VENTANA):
@@ -635,7 +627,7 @@ def armar_csv():
     writer.writeheader()
     for ts in sorted(filas):
         writer.writerow({"Times": datetime.fromtimestamp(ts).strftime("%Y-%m-%d %H:%M:%S"), **filas[ts]})
-    return buffer.getvalue().encode("utf-8-sig")  # con BOM: Excel muestra bien el "°"
+    return buffer.getvalue().encode("utf-8-sig")  # Excel muestra bien el "°"
 
 
 def exportar_csv(chat_id):
@@ -674,15 +666,15 @@ SIN_ACCESO = (
 )
 
 COMANDOS_BOT = [
-    ("menu", "Menu con botones"),
-    ("estado", "Resumen de nodos"),
+    ("menu", "Menu"),
+    ("estado", "Estado de los nodos"),
     ("alertas", "Alertas activas"),
     ("temp", "Temperatura actual"),
     ("humedad", "Humedad actual"),
     ("presion", "Presion actual"),
     ("rssi", "Senal WiFi actual"),
     ("grafica", "Grafica"),
-    ("csv", "Exportar datos a CSV"),
+    ("csv", "Exportar CSV"),
     ("silenciar", "Silenciar avisos"),
     ("activar", "Reanudar avisos"),
 ]
