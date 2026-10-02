@@ -7,5 +7,4 @@ telegram-bot/.env.example
 telegram-bot/usuarios.json
 *.log
 .DS_Store
-
-
+analisis/datos/
