@@ -22,7 +22,7 @@ def promedio_diario(df):
 
 def limpiar_picos(serie, ventana=5, umbral=5.0):
 
-    # Elimina picos de datos que se desvían significativamente del promedio local.
+    # Elimina picos de datos basura
     
     mediana_movil = serie.rolling(ventana, center=True, min_periods=1).median()
     es_pico = (serie - mediana_movil).abs() > umbral

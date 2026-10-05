@@ -1,7 +1,4 @@
-#!/usr/bin/env bash
-# Escanea la subred de los ESP32 y genera targets/*.json (file_sd_configs)
-# con su IP actual. Uso: ./descubrir_nodos.sh [--loop [segundos]]
-set -uo pipefail  # sin -e a proposito: el grep de mas abajo puede fallar sin abortar
+set -uo pipefail  
 
 for cmd in curl xargs mktemp grep; do
   command -v "$cmd" >/dev/null 2>&1 || {
@@ -21,7 +18,7 @@ mkdir -p "$DIR" || {
   exit 1
 }
 
-declare -A NODOS=(  # node_id (segun /data de cada placa) -> job de Prometheus
+declare -A NODOS=(  # node_id (segun /data de cada placa)
   ["bme280_esp32c3_01"]="bme280"
   ["dht22_esp32c3_01"]="dht22"
 )

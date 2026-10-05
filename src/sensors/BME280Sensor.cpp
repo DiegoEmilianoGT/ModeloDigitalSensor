@@ -12,7 +12,7 @@ bool BME280Sensor::begin() {
     return false;
   }
   Wire.setClock(I2C_FRECUENCIA_HZ);
-  Wire.setTimeOut(1000);  // evita que un I2C colgado bloquee el loop()
+  Wire.setTimeOut(1000);  // evita que un I2C colgado
 
   if (bme_.begin(0x76, &Wire)) {
     address_ = 0x76;

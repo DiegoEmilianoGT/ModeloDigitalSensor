@@ -212,7 +212,7 @@ void avisarIPPeriodico() {
                   WiFi.localIP().toString() + ":80/metrics");
 }
 
-// Reinicia el nodo si el heap libre cae demasiado, antes de arriesgar un crash.
+// Reinicia el nodo si el heap libre cae demasiado
 void vigilarMemoria() {
   static unsigned long ultimoAviso = 0;
   const unsigned long ahora = millis();
@@ -257,8 +257,7 @@ void conectarWiFi() {
   WiFi.disconnect();
   delay(1000);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-
-  // Debe ir despues de begin(), no antes -- ver README (defecto de antena SuperMini).
+  
   WiFi.setTxPower(WIFI_POWER_8_5dBm);
 
   const unsigned long inicio = millis();
