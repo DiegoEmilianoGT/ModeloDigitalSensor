@@ -7,7 +7,6 @@ rule_files:
   - "alertas_bme280.yml"
 
 scrape_configs:
-  # Targets sin IP fija: los genera prometheus/descubrir_nodos.sh en targets/*.json
   - job_name: "bme280"
     metrics_path: /metrics
     file_sd_configs:

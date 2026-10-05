@@ -19,9 +19,8 @@ groups:
         annotations:
           resumen: "El sensor no entrega lecturas validas"
 
-      # Umbrales: mismos valores que ALERTA_* de include/config.h.
-      # Si cambias uno alla, cambialo aqui tambien (y el texto del resumen).
-      # keep_firing_for evita avisos repetidos cuando el valor oscila en el limite.
+      # Umbrales: mismos valores que ALERTA_
+     
       - alert: TemperaturaAlta
         expr: bme280_temperatura_celsius > 30 or dht22_temperatura_celsius > 30
         for: 1m
