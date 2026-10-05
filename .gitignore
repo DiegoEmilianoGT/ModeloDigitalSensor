@@ -9,3 +9,4 @@ telegram-bot/usuarios.json
 *.log
 .DS_Store
 analisis/datos/
+analisis/resultados/

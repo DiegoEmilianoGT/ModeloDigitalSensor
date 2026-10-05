@@ -19,15 +19,6 @@ def resumen_estadistico(df):
 def promedio_diario(df):
     return df.resample('D').mean()
 
-if __name__ == "__main__":
-    try:
-        datos = cargar_datos()
-        print("Resumen estadístico:")
-        print(resumen_estadistico(datos))
-        print("\nPromedio diario:")
-        print(promedio_diario(datos))
-    except FileNotFoundError as e:
-        print(e)
 
 def limpiar_picos(serie, ventana=5, umbral=5.0):
 

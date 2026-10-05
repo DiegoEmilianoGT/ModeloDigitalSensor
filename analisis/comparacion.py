@@ -1,0 +1,58 @@
+import os
+import pandas as pd
+
+from estadisticas import cargar_datos, limpiar_datos, resumen_estadistico, promedio_diario
+
+CARPETA_SCRIPT = os.path.dirname(os.path.abspath(__file__))
+CARPETA_RESULTADOS = os.path.join(CARPETA_SCRIPT, "resultados")
+
+def comparar_sensores(df, metrica):
+
+    columnas = [c for c in df.columns if metrica in c]
+    if len(columnas) != 2:
+        raise ValueError(f"No hay suficientes sensores para comparar la métrica '{metrica}'.")
+
+    col_bme, col_dht = sorted(columnas)
+    comunes = df[[col_bme, col_dht]].dropna()
+    correlacion = comunes[col_bme].corr(comunes[col_dht])
+    diferencia_promedio = (comunes[col_dht] - comunes[col_bme]).mean()
+
+    return pd.Series({
+        "correlacion": correlacion,
+        "diferencia_promedio": diferencia_promedio,
+        "puntos_comparados": len(comunes)
+    })
+
+def guardar_resultados(resumen, promedios, comparaciones):
+    os.makedirs(CARPETA_RESULTADOS, exist_ok=True)
+    resumen.to_csv(os.path.join(CARPETA_RESULTADOS, "resumen_estadistico.csv"))
+    promedios.to_csv(os.path.join(CARPETA_RESULTADOS, "promedio_diario.csv"))
+    comparaciones.to_csv(os.path.join(CARPETA_RESULTADOS, "comparacion_sensores.csv"))
+    print(f"Resultados guardados en la carpeta: {CARPETA_RESULTADOS}")
+
+
+if __name__ == "__main__":
+    try:
+        datos = cargar_datos()
+        datos = limpiar_datos(datos)
+
+        resumen = resumen_estadistico(datos)
+        promedios = promedio_diario(datos)
+
+        comparaciones = pd.DataFrame({
+            "humedad": comparar_sensores(datos, "humedad"),
+            "temperatura": comparar_sensores(datos, "temperatura")
+        })
+
+        print("Resumen estadístico:")
+        print(resumen)
+        print("\nPromedio diario:")
+        print(promedios)
+        print("\nComparación de sensores:")
+        print(comparaciones)
+        guardar_resultados(resumen, promedios, comparaciones)
+
+
+    except FileNotFoundError as e:
+        print(e)
+
