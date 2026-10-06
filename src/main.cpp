@@ -1,6 +1,8 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <WebServer.h>
+#include <LittleFS.h>
+#include <time.h>
 #include "config.h"
 #include "secrets.h"
 #if defined(SENSOR_BME280)
@@ -22,6 +24,10 @@ bool redLista           = false;
 unsigned long ultimoAvisoIP = 0;
 
 #define AVISO_IP_INTERVALO_MS 30000UL
+
+unsigned long ultimoIntentoWiFi  = 0;
+unsigned long inicioDesconexion  = 0;
+uint32_t      lineasEnBuffer     = 0;
 
 void iniciarServidor();
 
@@ -180,11 +186,94 @@ void handleMetrics() {
   server.send(200, "text/plain; version=0.0.4; charset=utf-8", out);
 }
 
+//Buffer local
+
+bool horaValida() {
+  return time(nullptr) > 1700000000;
+}
+
+void contarLineasBuffer() {
+  lineasEnBuffer = 0;
+  File f = LittleFS.open(BUFFER_ARCHIVO, "r");
+  if (!f) return;
+  while (f.available()) {
+    if (f.read() == '\n') lineasEnBuffer++;
+  }
+  f.close();
+}
+
+void guardarEnBuffer() {
+  static unsigned long ultimoGuardado = 0;
+  const unsigned long ahora = millis();
+  if (ultimoGuardado != 0 && ahora - ultimoGuardado < BUFFER_INTERVALO_MS) return;
+  ultimoGuardado = ahora;
+
+  if (!horaValida()) {
+    Serial.println("[Buffer] Hora no sincronizada todavia (sin WiFi desde el arranque); se omite esta lectura");
+    return;
+  }
+  if (lineasEnBuffer >= BUFFER_MAX_LECTURAS) {
+    return;  // tope de seguridad 30 dias
+  }
+
+  bool hayDatoValido = false;
+  String linea = String((unsigned long)time(nullptr));
+
+#if defined(SENSOR_BME280)
+  if (bme.isValid()) {
+    linea += "," + String(bme.temperature(), 2) + "," + String(bme.humidity(), 2) + "," + String(bme.pressureHpa(), 2);
+    hayDatoValido = true;
+  } else {
+    linea += ",,,";
+  }
+#endif
+#if defined(SENSOR_DHT22)
+  if (dht22.isValid()) {
+    linea += "," + String(dht22.temperature(), 2) + "," + String(dht22.humidity(), 2);
+    hayDatoValido = true;
+  } else {
+    linea += ",,";
+  }
+#endif
+
+  if (!hayDatoValido) return; 
+
+  File f = LittleFS.open(BUFFER_ARCHIVO, "a");
+  if (!f) {
+    Serial.println("[Buffer] No se pudo abrir el archivo para escribir");
+    return;
+  }
+  f.println(linea);
+  f.close();
+  lineasEnBuffer++;
+  Serial.printf("[Buffer] Lectura guardada (%u en total)\n", lineasEnBuffer);
+}
+
+void handleBuffer() {
+  server.sendHeader("Access-Control-Allow-Origin", "*");
+  File f = LittleFS.open(BUFFER_ARCHIVO, "r");
+  if (!f) {
+    server.send(200, "text/csv", "");
+    return;
+  }
+  server.streamFile(f, "text/csv");
+  f.close();
+}
+
+void handleBufferConfirmar() {
+  LittleFS.remove(BUFFER_ARCHIVO);
+  lineasEnBuffer = 0;
+  Serial.println("[Buffer] Confirmado: buffer vaciado");
+  server.send(200, "text/plain", "ok\n");
+}
+
 void iniciarServidor() {
   server.stop();
   server.on("/", handleRoot);
   server.on("/data", handleData);
   server.on("/metrics", handleMetrics);
+  server.on("/buffer", handleBuffer);
+  server.on("/buffer/confirmar", handleBufferConfirmar);
   server.onNotFound([]() {
     server.send(404, "text/plain", "Ruta no encontrada\n");
   });
@@ -196,11 +285,15 @@ void iniciarServidor() {
 
 void alConectar() {
   redLista = true;
+  inicioDesconexion = 0;
 
   Serial.println("[WiFi] IP: " + WiFi.localIP().toString());
   Serial.println("[WiFi] MAC: " + WiFi.macAddress());
   Serial.printf("[WiFi] RSSI: %d dBm\n", WiFi.RSSI());
   Serial.println("[Prometheus] Target: " + WiFi.localIP().toString() + ":80/metrics");
+
+  configTime(0, 0, "pool.ntp.org", "time.google.com");  // fechar el buffer
+
   iniciarServidor();
 }
 
@@ -248,33 +341,51 @@ void escanearRedes() {
   WiFi.scanDelete();
 }
 
-// Bloqueante a proposito: si no conecta en WIFI_TIMEOUT_MS, reinicia el nodo.
-void conectarWiFi() {
-  if (WiFi.status() == WL_CONNECTED) return;
-
-  redLista = false;
+bool intentarConectarWiFi() {
   Serial.println("[WiFi] Conectando...");
   WiFi.disconnect();
   delay(1000);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-  
   WiFi.setTxPower(WIFI_POWER_8_5dBm);
 
   const unsigned long inicio = millis();
   while (WiFi.status() != WL_CONNECTED) {
     if (millis() - inicio > WIFI_TIMEOUT_MS) {
-      Serial.println("[WiFi] Timeout.");
-      escanearRedes();
-      Serial.println("[WiFi] Reiniciando...");
-      delay(500);
-      ESP.restart();
+      Serial.println("[WiFi] Timeout en este intento.");
+      return false;
     }
     delay(500);
     Serial.print(".");
   }
   Serial.println();
+  return true;
+}
 
-  alConectar();
+void gestionarWiFi() {
+  if (WiFi.status() == WL_CONNECTED) return;
+
+  if (redLista) {
+    redLista = false;
+    Serial.println("[WiFi] Se perdio la conexion");
+  }
+  if (inicioDesconexion == 0) inicioDesconexion = millis();
+
+  const unsigned long ahora = millis();
+  if (ultimoIntentoWiFi != 0 && ahora - ultimoIntentoWiFi < WIFI_REINTENTO_MS) return;
+  ultimoIntentoWiFi = ahora;
+
+  if (intentarConectarWiFi()) {
+    alConectar();
+    return;
+  }
+
+  if (ahora - inicioDesconexion > WIFI_REINICIO_MS) {
+    Serial.println("[WiFi] Demasiado tiempo sin conectar.");
+    escanearRedes();
+    Serial.println("[WiFi] Reiniciando como ultimo recurso...");
+    delay(500);
+    ESP.restart();
+  }
 }
 
 void setup() {
@@ -282,6 +393,12 @@ void setup() {
   delay(1000);
 
   Serial.printf("=== Nodo %s ===\n", NODO_ID);
+
+  if (!LittleFS.begin(true)) {
+    Serial.println("[Buffer] No se pudo montar LittleFS");
+  }
+  contarLineasBuffer();
+  Serial.printf("[Buffer] Lecturas pendientes de subir: %u\n", lineasEnBuffer);
 
 #if defined(SENSOR_BME280)
   bme.begin();
@@ -300,20 +417,11 @@ void setup() {
 
   escanearRedes();
 
-  conectarWiFi();
+  gestionarWiFi();
 }
 
 void loop() {
-  if (WiFi.status() != WL_CONNECTED) {
-    conectarWiFi();
-    return;
-  }
-
-  avisarIPPeriodico();
-  vigilarMemoria();
-
-  if (!servidorActivo) iniciarServidor();
-  server.handleClient();
+  gestionarWiFi();
 
 #if defined(SENSOR_BME280)
   bme.update();
@@ -322,6 +430,15 @@ void loop() {
 #if defined(SENSOR_DHT22)
   dht22.update();
 #endif
+
+  if (WiFi.status() == WL_CONNECTED) {
+    avisarIPPeriodico();
+    vigilarMemoria();
+    if (!servidorActivo) iniciarServidor();
+    server.handleClient();
+  } else {
+    guardarEnBuffer();
+  }
 
   delay(2);
 }

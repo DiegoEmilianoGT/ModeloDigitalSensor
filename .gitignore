@@ -17,3 +17,5 @@ prometheus/descubrir_nodos.service
 prometheus/descubrir_nodos.sh
 telegram-bot/telegram-bot.service
 telegram-bot/usuarios.json
+analisis/recuperar-buffer.service
+analisis/recuperar-buffer.timer
