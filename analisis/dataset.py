@@ -1,7 +1,7 @@
 import csv
 import os
 import time
-from datetime import datetime 
+from datetime import datetime
 import requests
 
 PROMETHEUS_URL = "http://localhost:9090"
@@ -56,7 +56,32 @@ def pedir_datos():
             for marca_de_tiempo, valor in serie["values"]:
                 filas.setdefault(int(marca_de_tiempo), {})[columna] = valor
 
-    return filas, sorted(columnas)
+    return filas, columnas
+
+
+def cargar_existente():
+    if not os.path.exists(RUTA_SALIDA):
+        return {}, set()
+
+    filas, columnas = {}, set()
+    with open(RUTA_SALIDA, newline="", encoding="utf-8") as archivo:
+        for fila in csv.DictReader(archivo):
+            marca = int(datetime.strptime(fila["Times"], "%Y-%m-%d %H:%M:%S").timestamp())
+            valores = {k: v for k, v in fila.items() if k != "Times" and v != ""}
+            filas[marca] = valores
+            columnas.update(valores)
+    return filas, columnas
+
+
+def fusionar(filas_base, columnas_base, filas_nuevas, columnas_nuevas, dias=DIAS):
+    filas = {marca: dict(valores) for marca, valores in filas_base.items()}
+    for marca, valores in filas_nuevas.items():
+        filas.setdefault(marca, {}).update(valores)
+
+    limite = int(time.time()) - dias * 24 * 3600
+    filas = {marca: valores for marca, valores in filas.items() if marca >= limite}
+    columnas = {c for c in (columnas_base | columnas_nuevas)}
+    return filas, columnas
 
 
 def guardar_csv(filas, columnas):
@@ -72,10 +97,12 @@ def guardar_csv(filas, columnas):
             fecha = datetime.fromtimestamp(marca).strftime("%Y-%m-%d %H:%M:%S")
             escritor.writerow({"Times": fecha, **filas[marca]})
 
-    print(f"Datos guardados en {RUTA_SALIDA}")
+    print(f"Datos guardados en {RUTA_SALIDA} ({len(filas)} filas)")
 
 
 if __name__ == "__main__":
     preparar_carpeta()
-    filas, columnas = pedir_datos()
+    existentes, columnas_existentes = cargar_existente()
+    nuevas, columnas_nuevas = pedir_datos()
+    filas, columnas = fusionar(existentes, columnas_existentes, nuevas, columnas_nuevas)
     guardar_csv(filas, columnas)

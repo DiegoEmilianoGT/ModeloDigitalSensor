@@ -36,11 +36,30 @@ def limpiar_datos(df):
                 df[columna] = limpiar_picos(df[columna], umbral=umbral)
     return df
 
+
+def resumen_limpieza(original, limpio):
+    filas = []
+    for columna in original.columns:
+        descartados = int(limpio[columna].isna().sum() - original[columna].isna().sum())
+        filas.append({
+            "columna": columna,
+            "minimo": limpio[columna].min(),
+            "maximo": limpio[columna].max(),
+            "normales": int(limpio[columna].notna().sum()),
+            "picos_descartados": descartados,
+        })
+    return pd.DataFrame(filas).set_index("columna")
+
+
 if __name__ == "__main__":
     try:
-        datos = cargar_datos()
-        datos = limpiar_datos(datos)
-        print("Resumen estadístico:")
+        crudos = cargar_datos()
+        datos = limpiar_datos(crudos)
+
+        print("Resumen de limpieza (minimo, maximo, normales, picos descartados):")
+        print(resumen_limpieza(crudos, datos))
+
+        print("\nResumen estadístico:")
         print(resumen_estadistico(datos))
 
         print("\nPromedio diario:")
