@@ -1,7 +1,7 @@
 import os
 import pandas as pd
 
-from estadisticas import cargar_datos, limpiar_datos, resumen_estadistico, promedio_diario, resumen_limpieza, promedio_30_dias
+from estadisticas import cargar_datos, limpiar_datos, resumen_estadistico, promedio_diario, resumen_limpieza, promedio_30_dias, calibrar
 
 CARPETA_SCRIPT = os.path.dirname(os.path.abspath(__file__))
 CARPETA_RESULTADOS = os.path.join(CARPETA_SCRIPT, "resultados")
@@ -36,7 +36,8 @@ def guardar_resultados(limpieza, resumen, promedios, comparaciones, promedio_30d
 if __name__ == "__main__":
     try:
         crudos = cargar_datos()
-        datos = limpiar_datos(crudos)
+        calibrados = calibrar(crudos)
+        datos = limpiar_datos(calibrados)
 
         limpieza = resumen_limpieza(crudos, datos)
         resumen = resumen_estadistico(datos)

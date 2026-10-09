@@ -22,7 +22,7 @@ groups:
       # Umbrales: mismos valores que ALERTA_
      
       - alert: TemperaturaAlta
-        expr: bme280_temperatura_celsius > 30 or dht22_temperatura_celsius > 30
+        expr: bme280_temperatura_celsius_calibrada > 30 or dht22_temperatura_celsius_calibrada > 30
         for: 1m
         keep_firing_for: 2m
         labels:
@@ -31,7 +31,7 @@ groups:
           resumen: '{{ $value | printf "%.1f" }} °C (maximo 30 °C)'
 
       - alert: TemperaturaBaja
-        expr: bme280_temperatura_celsius < 10 or dht22_temperatura_celsius < 10
+        expr: bme280_temperatura_celsius_calibrada < 10 or dht22_temperatura_celsius_calibrada < 10
         for: 1m
         keep_firing_for: 2m
         labels:
@@ -40,7 +40,7 @@ groups:
           resumen: '{{ $value | printf "%.1f" }} °C (minimo 10 °C)'
 
       - alert: HumedadAlta
-        expr: bme280_humedad_porcentaje > 65 or dht22_humedad_porcentaje > 65
+        expr: bme280_humedad_porcentaje_calibrada > 65 or dht22_humedad_porcentaje_calibrada > 65
         for: 1m
         keep_firing_for: 2m
         labels:
@@ -49,7 +49,7 @@ groups:
           resumen: '{{ $value | printf "%.1f" }} % (maximo 65 %)'
 
       - alert: HumedadBaja
-        expr: bme280_humedad_porcentaje < 15 or dht22_humedad_porcentaje < 15
+        expr: bme280_humedad_porcentaje_calibrada < 15 or dht22_humedad_porcentaje_calibrada < 15
         for: 1m
         keep_firing_for: 2m
         labels:

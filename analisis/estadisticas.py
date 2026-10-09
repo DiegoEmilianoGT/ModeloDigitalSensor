@@ -1,6 +1,8 @@
 import os
 import pandas as pd
 
+from calibracion import calibrar
+
 CARPETA_SCRIPT = os.path.dirname(os.path.abspath(__file__))
 RUTA_DATASET = os.path.join(CARPETA_SCRIPT, "datos", "dataset_sensores.csv")
 UMBRALES = {"humedad": 5, "temperatura": 2, "presion": 10}
@@ -62,7 +64,8 @@ def resumen_limpieza(original, limpio):
 if __name__ == "__main__":
     try:
         crudos = cargar_datos()
-        datos = limpiar_datos(crudos)
+        calibrados = calibrar(crudos)
+        datos = limpiar_datos(calibrados)
 
         print("Resumen de limpieza (minimo, maximo, normales, picos descartados):")
         print(resumen_limpieza(crudos, datos))
