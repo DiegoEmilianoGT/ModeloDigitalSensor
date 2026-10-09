@@ -19,3 +19,5 @@ telegram-bot/telegram-bot.service
 telegram-bot/usuarios.json
 analisis/recuperar-buffer.service
 analisis/recuperar-buffer.timer
+analisis/analisis.service
+analisis/analisis.timer

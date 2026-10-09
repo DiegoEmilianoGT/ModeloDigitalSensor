@@ -50,8 +50,7 @@ TITULOS = {
     "TemperaturaBaja": "Temperatura baja",
     "HumedadAlta": "Humedad alta",
     "HumedadBaja": "Humedad baja",
-    "PresionFueraDeRango": "Presion fuera de rango",
-    "SenalWiFiDebil": "Senal WiFi debil",
+    "PresionFueraDeRango": "Presion fuera de rango"
 }
 
 CSV_DIAS = 7

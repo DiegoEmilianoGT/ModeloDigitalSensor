@@ -65,11 +65,3 @@ groups:
           severity: warning
         annotations:
           resumen: '{{ $value | printf "%.0f" }} hPa (rango 700 a 1050 hPa)'
-
-      - alert: SenalWiFiDebil
-        expr: bme280_wifi_rssi_dbm < -80 or dht22_wifi_rssi_dbm < -80
-        for: 10m
-        labels:
-          severity: info
-        annotations:
-          resumen: "Senal de {{ $value }} dBm"

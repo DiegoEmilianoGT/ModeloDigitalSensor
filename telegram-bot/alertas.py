@@ -47,7 +47,6 @@ def info_alerta(alerta):
     return {
         "nombre": labels.get("alertname", "?"),
         "nodo": acortar(labels.get("nodo") or labels.get("location") or labels.get("job", "?").upper()),
-        "ip": labels.get("instance", "").split(":")[0],
         "resumen": notas.get("resumen") or notas.get("summary") or "",
         "desde": hora_local(alerta.get("activeAt")),
         "desde_ts": inicio.timestamp() if inicio else None,
@@ -60,8 +59,6 @@ def linea_alerta(info):
     lineas = [f"<b>{esc(TITULOS.get(info['nombre'], info['nombre']))}: {esc(info['nodo'])}</b>"]
     if info["nombre"] == "NodoCaido":
         lineas.append(f"{SANGRIA}Sin respuesta desde las {info['desde']}")
-        if info["ip"]:
-            lineas.append(f"{SANGRIA}IP {esc(info['ip'])}")
     else:
         if info["resumen"]:
             lineas.append(f"{SANGRIA}{esc(acortar(info['resumen']))}")
