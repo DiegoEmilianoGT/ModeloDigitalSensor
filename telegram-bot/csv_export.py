@@ -8,6 +8,7 @@ from config import CSV_DIAS, CSV_METRICAS, CSV_PASO, CSV_VENTANA, ETIQUETAS, log
 from prometheus_api import ERRORES_PROM, prom_get
 from telegram_api import enviar_archivo, enviar_mensaje
 from texto import acortar
+from calibracion import calibrar
 
 RUTA_DATASET_ANALISIS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "analisis", "datos", "dataset_sensores.csv")
 
@@ -29,7 +30,7 @@ def leer_recuperadas():
                     continue
                 nombre, unidad = ETIQUETAS[metrica]
                 columna_bot = f"{ubicacion} - {nombre} ({unidad})"
-                filas.setdefault(int(ts), {})[columna_bot] = valor 
+                filas.setdefault(int(ts), {})[columna_bot] = calibrar(metrica, float(valor))
     return filas
 
 def armar_csv():
@@ -43,11 +44,12 @@ def armar_csv():
         hasta = min(desde + CSV_VENTANA, fin)
         series = prom_get("query_range", timeout=20, query=consulta, start=desde, end=hasta, step=CSV_PASO)["result"]
         for s in series:
-            nombre, unidad = ETIQUETAS[s["metric"]["__name__"]]
+            metrica = s["metric"]["__name__"]
+            nombre, unidad = ETIQUETAS[metrica]
             columna = f"{acortar(s['metric'].get('location', '?'))} - {nombre} ({unidad})"
             columnas.add(columna)
             for t, v in s["values"]:
-                filas.setdefault(int(t), {})[columna] = v
+                filas.setdefault(int(t), {})[columna] = calibrar(metrica, float(v))
 
     for ts, valores in leer_recuperadas().items():
         destino = filas.setdefault(ts, {})

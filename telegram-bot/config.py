@@ -18,12 +18,10 @@ CHECK_INTERVAL_SEC = int(os.environ.get("CHECK_INTERVAL_SEC", "30"))
 ALERT_COOLDOWN_SEC = int(os.environ.get("ALERT_COOLDOWN_SEC", "300"))
 
 ETIQUETAS = {
-    "bme280_sensor_up": ("Sensor", None),
     "bme280_temperatura_celsius": ("Temperatura", "°C"),
     "bme280_humedad_porcentaje": ("Humedad", "%"),
     "bme280_presion_hpa": ("Presion", "hPa"),
     "bme280_wifi_rssi_dbm": ("RSSI", "dBm"),
-    "dht22_sensor_up": ("Sensor", None),
     "dht22_temperatura_celsius": ("Temperatura", "°C"),
     "dht22_humedad_porcentaje": ("Humedad", "%"),
     "dht22_wifi_rssi_dbm": ("RSSI", "dBm"),

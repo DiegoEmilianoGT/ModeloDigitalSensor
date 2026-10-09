@@ -5,7 +5,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-from estadisticas import cargar_datos, limpiar_datos
+from estadisticas import cargar_datos, limpiar_datos, calibrar
 
 CARPETA_SCRIPT = os.path.dirname(os.path.abspath(__file__))
 CARPETA_RESULTADOS = os.path.join(CARPETA_SCRIPT, "resultados")
@@ -37,7 +37,7 @@ def graficar(df):
 
 if __name__ == "__main__":
     try:
-        datos = cargar_datos()
+        datos = calibrar(cargar_datos())
         datos = limpiar_datos(datos)
         figura = graficar(datos)
 

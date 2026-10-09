@@ -1,0 +1,12 @@
+groups:
+  -name: calibracion
+    rules:
+      -record: bme280_temperatura_celsius_calibrada
+        expr: bme280_temperatura_celsius + 0.0
+      -record: bme280_humedad_porcentaje_calibrada
+        expr: bme280_humedad_porcentaje + 0.0
+      -record: dht22_temperatura_celsius_calibrada
+        expr: dht22_temperatura_celsius + 0.0
+      -record: dht22_humedad_porcentaje_calibrada
+        expr: dht22_humedad_porcentaje + 0.0
+      

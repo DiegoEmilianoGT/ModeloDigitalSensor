@@ -17,6 +17,7 @@ from config import GRAFICAS, RANGOS, log
 from prometheus_api import ERRORES_PROM, prom_get
 from telegram_api import TECLADO_GRAFICAS, enviar_archivo, enviar_mensaje
 from texto import acortar, bloque
+from calibracion import calibrar
 
 MENSAJE_GRAFICAS = "<b>Graficas</b>\nElige que medir y cuanto tiempo"
 
@@ -35,13 +36,16 @@ def generar_grafica(clave, rango):
         resumen = []
         for s in series:
             xs, ys, previo = [], [], None
+
+            metrica = s["metric"]["__name__"]
+            
             for t, v in s["values"]:
                 t = float(t)
                 if previo is not None and t - previo > 4 * paso:
                     xs.append(datetime.fromtimestamp(previo + paso))
                     ys.append(float("nan"))  # corta si el nodo no reporta
                 xs.append(datetime.fromtimestamp(t))
-                ys.append(float(v))
+                ys.append(calibrar(metrica, float(v)))
                 previo = t
             etiqueta = acortar(s["metric"].get("location", "?"))
             ax.plot(xs, ys, label=etiqueta, linewidth=1.6)

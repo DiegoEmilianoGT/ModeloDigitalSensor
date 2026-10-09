@@ -3,6 +3,7 @@
 from config import ETIQUETAS, MEDIDAS, log
 from prometheus_api import ERRORES_PROM, prom_query
 from texto import acortar, bloque
+from calibracion import calibrar
 
 
 def leer_todo():
@@ -12,7 +13,7 @@ def leer_todo():
             metrica = r["metric"].get("__name__")
             if metrica in ETIQUETAS:
                 location = r["metric"].get("location", "desconocido")
-                lecturas.setdefault(location, {})[metrica] = float(r["value"][1])
+                lecturas.setdefault(location, {})[metrica] = calibrar(metrica, float(r["value"][1]))
     except ERRORES_PROM as exc:
         log.warning("No se pudieron consultar las metricas: %s", exc)
     try:
