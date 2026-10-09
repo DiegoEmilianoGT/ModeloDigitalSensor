@@ -26,10 +26,10 @@
 
 #define HEAP_MINIMO_BYTES 20000UL
 #define BUFFER_ARCHIVO        "/buffer.csv"
-#define BUFFER_INTERVALO_MS  (120UL*1000UL)
-#define BUFFER_MAX_LECTURAS   21600UL
+#define BUFFER_INTERVALO_MS   (60UL*1000UL)
+#define BUFFER_MAX_LECTURAS    28800UL  // 20 dias a 1 lectura/min
 
-// Umbrales de alerta (BME280)
+// Umbrales de alerta
 #define ALERTA_TEMP_MAX       30.0f
 #define ALERTA_TEMP_MIN       10.0f
 #define ALERTA_HUM_MAX        65.0f

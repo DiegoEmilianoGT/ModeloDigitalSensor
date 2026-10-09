@@ -4,6 +4,7 @@ import pandas as pd
 CARPETA_SCRIPT = os.path.dirname(os.path.abspath(__file__))
 RUTA_DATASET = os.path.join(CARPETA_SCRIPT, "datos", "dataset_sensores.csv")
 UMBRALES = {"humedad": 5, "temperatura": 2, "presion": 10}
+DIAS = 30
 
 def cargar_datos():
     if not os.path.exists(RUTA_DATASET):
@@ -11,6 +12,10 @@ def cargar_datos():
 
     df = pd.read_csv(RUTA_DATASET, parse_dates=["Times"])
     df = df.set_index("Times")
+
+    limite = pd.Timestamp.now() - pd.Timedelta(days=DIAS)
+    df = df[df.index >= limite]
+
     return df
 
 def resumen_estadistico(df):
@@ -18,6 +23,9 @@ def resumen_estadistico(df):
 
 def promedio_diario(df):
     return df.resample('D').mean()
+
+def promedio_30_dias(df):
+    return df.mean()
 
 
 def limpiar_picos(serie, ventana=5, umbral=5.0):

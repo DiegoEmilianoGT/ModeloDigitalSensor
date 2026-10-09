@@ -324,10 +324,10 @@ void vigilarMemoria() {
 
 // Diagnostico: lista las redes 2.4GHz visibles y si WIFI_SSID esta entre ellas.
 void escanearRedes() {
-  Serial.println("[WiFi] Escaneando redes visibles...");
+  Serial.println("[WiFi] Redes visibles...");
   int n = WiFi.scanNetworks();
   if (n == WIFI_SCAN_FAILED) {
-    Serial.println("[WiFi] El escaneo no pudo iniciar (radio ocupado).");
+    Serial.println("[WiFi] El escaneo no pudo iniciar.");
   } else if (n <= 0) {
     Serial.println("[WiFi] No se detecto ninguna red 2.4GHz cerca.");
   } else {
