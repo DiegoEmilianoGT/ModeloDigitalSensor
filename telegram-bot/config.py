@@ -94,4 +94,6 @@ COMANDOS_PUBLICOS = [("solicitar", "Pedir acceso al bot")]
 COMANDOS_ADMIN = [
     ("usuarios", "Ver usuarios y solicitudes"),
     ("revocar", "Quitar el acceso a alguien"),
+    ("calibrar", "Calibrar sensores"),
 ]
+
