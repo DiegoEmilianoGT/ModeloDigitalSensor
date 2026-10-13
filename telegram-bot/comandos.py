@@ -4,6 +4,7 @@ from alertas import comando_activar, comando_silenciar, formatear_alertas
 from consultas import formatear_estado, formatear_metrica
 from graficas import MENSAJE_GRAFICAS, enviar_grafica
 from telegram_api import TECLADO_GRAFICAS, TECLADO_MENU, enviar_mensaje, telegram
+from calibracion import comando_calibrar
 from usuarios import (
     comando_revocar,
     comando_solicitar,
@@ -27,6 +28,8 @@ def ejecutar(chat_id, accion, args):
             enviar_mensaje(chat_id, MENSAJE_GRAFICAS, TECLADO_GRAFICAS)
     elif accion == "csv":
         exportar_csv(chat_id)
+    elif accion == "calibrar":
+        comando_calibrar(chat_id, args)
     elif accion == "silenciar":
         comando_silenciar(chat_id)
     elif accion == "activar":
