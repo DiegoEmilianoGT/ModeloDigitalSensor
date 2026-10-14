@@ -5,7 +5,7 @@ from calibracion import calibrar
 
 CARPETA_SCRIPT = os.path.dirname(os.path.abspath(__file__))
 RUTA_DATASET = os.path.join(CARPETA_SCRIPT, "datos", "dataset_sensores.csv")
-UMBRALES = {"humedad": 5, "temperatura": 2, "presion": 10}
+UMBRALES = {"humedad": 5, "temperatura": 2}
 DIAS = 30
 
 def cargar_datos():

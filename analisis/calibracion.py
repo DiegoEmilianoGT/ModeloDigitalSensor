@@ -7,12 +7,14 @@ def cargar_offsets():
     with open(RUTA_OFFSETS, encoding="utf-8") as f:
         return json.load(f)
 
-def calibrar_sensor(df, offsets):
-    df= df.copy()
+def calibrar(df):
+    offsets = cargar_offsets()
+    df = df.copy()
     for columna in df.columns:
-        _,_, metrica = columna.partition("-_")
+        _, _, metrica = columna.partition("-_")
         if metrica in offsets:
             df[columna] = (df[columna] + offsets[metrica]).round(2)
     return df
+
 
 

@@ -1,4 +1,4 @@
-set -uo pipefail  
+set -uo pipefail
 
 for cmd in curl xargs mktemp grep; do
   command -v "$cmd" >/dev/null 2>&1 || {
@@ -18,38 +18,48 @@ mkdir -p "$DIR" || {
   exit 1
 }
 
-declare -A NODOS=(  # node_id (segun /data de cada placa)
+declare -A NODOS=(  # node_id
   ["bme280_esp32c3_01"]="bme280"
+  ["bme280_esp32c3_02"]="bme280"
+  ["bme280_esp32c3_03"]="bme280"
   ["dht22_esp32c3_01"]="dht22"
 )
 
 escanear_una_vez() {
   local tmp
   if ! tmp="$(mktemp)"; then
-    echo "ERROR: no se pudo crear un archivo temporal, se salta este escaneo." >&2
+    echo "ERROR: no se pudo crear un archivo temporal." >&2
     return 1
   fi
-
   seq 1 254 | xargs -P "$PARALELISMO" -I{} bash -c '
-    ip="'"$SUBRED"'.{}"
-    resp=$(curl -s -m '"$TIMEOUT"' "http://$ip:'"$PUERTO"'/data" 2>/dev/null)
+    ip="'$SUBRED'.{}"
+    resp=$(curl -s -m "'$TIMEOUT'" "http://$ip:'$PUERTO'/data" 2>/dev/null)
     [ -n "$resp" ] && printf "%s|%s\n" "$ip" "$resp"
-  ' > "$tmp"
+  ' >"$tmp"
+  local -A entradas_por_job=()
 
-  local encontrados=0
   for node_id in "${!NODOS[@]}"; do
     local job="${NODOS[$node_id]}"
-    local linea ip
-    linea=$(grep -F "\"node_id\":\"$node_id\"" "$tmp" | head -1)
+    local linea ip entrada
+    linea="$(grep -F "\"node_id\":\"$node_id\"" "$tmp" | head -n 1)"
     if [ -z "$linea" ]; then
-      echo "[$(date '+%H:%M:%S')] $node_id ($job): no encontrado en $SUBRED.0/24"
+      echo "[$(date +%Y-%m-%d\ %H:%M:%S)] ERROR: no se encontró el nodo '$node_id'" >&2
       continue
     fi
     ip="${linea%%|*}"
-    printf '[{"targets":["%s:%s"],"labels":{"nodo":"%s"}}]\n' "$ip" "$PUERTO" "$node_id" \
-      > "$DIR/$job.json.nuevo"
+    entrada="{\"targets\": [\"$ip:$PUERTO\"], \"labels\": {\"nodo\": \"$node_id\"}}"
+    if [ -z "${entradas_por_job[$job]:-}" ]; then
+      entradas_por_job[$job]="$entrada"
+    else
+      entradas_por_job[$job]="${entradas_por_job[$job]}, $entrada"
+    fi
+    echo "[$(date +%Y-%m-%d\ %H:%M:%S)] NODO: '$node_id' IP: $ip"
+  done
+
+  local encontrados=0
+  for job in "${!entradas_por_job[@]}"; do
+    printf '[%s]\n' "${entradas_por_job[$job]}" >"$DIR/$job.json.nuevo"
     mv "$DIR/$job.json.nuevo" "$DIR/$job.json"
-    echo "[$(date '+%H:%M:%S')] $node_id ($job) -> $ip"
     encontrados=$((encontrados + 1))
   done
 

@@ -22,4 +22,3 @@ analisis/recuperar-buffer.service
 analisis/recuperar-buffer.timer
 analisis/analisis.service
 analisis/analisis.timer
-modelo/

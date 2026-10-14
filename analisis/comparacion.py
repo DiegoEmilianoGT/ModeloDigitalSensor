@@ -7,21 +7,22 @@ CARPETA_SCRIPT = os.path.dirname(os.path.abspath(__file__))
 CARPETA_RESULTADOS = os.path.join(CARPETA_SCRIPT, "resultados")
 
 def comparar_sensores(df, metrica):
-
     columnas = [c for c in df.columns if metrica in c]
-    if len(columnas) != 2:
+    if len(columnas) < 2:
         raise ValueError(f"No hay suficientes sensores para comparar la métrica '{metrica}'.")
 
-    col_bme, col_dht = sorted(columnas)
-    comunes = df[[col_bme, col_dht]].dropna()
-    correlacion = comunes[col_bme].corr(comunes[col_dht])
-    diferencia_promedio = (comunes[col_dht] - comunes[col_bme]).mean()
+    comunes = df[columnas].dropna()
+    resultado = {}
+    for columna in columnas:
+        otros = [c for c in columnas if c != columna]
+        diferencias = comunes[otros].mean(axis=1)
+        resultado[columna] = {
+            "correlacion": comunes[columna].corr(diferencias),
+            "diferencia_promedio": (comunes[columna] - diferencias).mean(),
+            "puntos_comunes": len(comunes)
+        }
+    return pd.DataFrame(resultado).T
 
-    return pd.Series({
-        "correlacion": correlacion,
-        "diferencia_promedio": diferencia_promedio,
-        "puntos_comparados": len(comunes)
-    })
 
 def guardar_resultados(limpieza, resumen, promedios, comparaciones, promedio_30d):
     os.makedirs(CARPETA_RESULTADOS, exist_ok=True)
@@ -44,7 +45,7 @@ if __name__ == "__main__":
         promedios = promedio_diario(datos)
         promedio_30d = promedio_30_dias(datos)
 
-        comparaciones = pd.DataFrame({
+        comparaciones = pd.concat({
             "humedad": comparar_sensores(datos, "humedad"),
             "temperatura": comparar_sensores(datos, "temperatura")
         })
