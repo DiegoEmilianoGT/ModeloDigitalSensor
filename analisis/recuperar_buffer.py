@@ -1,7 +1,6 @@
 import glob
 import json
 import os
-
 import requests
 
 from dataset import DIAS, RUTA_SALIDA, cargar_existente, fusionar, guardar_csv, preparar_carpeta
