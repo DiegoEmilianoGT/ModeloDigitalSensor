@@ -4,7 +4,7 @@ groups:
       - record: bme280_temperatura_celsius_calibrada
         expr: bme280_temperatura_celsius + 0.0
       - record: bme280_humedad_porcentaje_calibrada
-        expr: bme280_humedad_porcentaje + 16.0
+        expr: bme280_humedad_porcentaje + 16.11
       - record: dht22_temperatura_celsius_calibrada
         expr: dht22_temperatura_celsius + 0.0
       - record: dht22_humedad_porcentaje_calibrada

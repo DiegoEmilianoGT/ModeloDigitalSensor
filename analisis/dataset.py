@@ -12,7 +12,6 @@ VENTANA = PASO * 10_000
 METRICAS = (
     "bme280_temperatura_celsius",
     "bme280_humedad_porcentaje",
-    "bme280_presion_hpa",
 
     "dht22_temperatura_celsius",
     "dht22_humedad_porcentaje"
