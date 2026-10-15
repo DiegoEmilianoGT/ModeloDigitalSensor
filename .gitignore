@@ -13,7 +13,7 @@ analisis/resultados/
 analisis/actualizar-dataset.service
 analisis/actualizar-dataset.timer
 prometheus/targets/
-prometheus/descubrir_nodos.service
+prometheus/descubrir-nodos.service
 prometheus/descubrir_nodos.sh
 telegram-bot/telegram-bot.service
 telegram-bot/usuarios.json
