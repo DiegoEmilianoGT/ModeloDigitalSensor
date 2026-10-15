@@ -1,5 +1,3 @@
-#Punto de entrada del bot: solo el bucle principal.
-
 import time
 
 from alertas import revisar_alertas

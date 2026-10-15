@@ -17,9 +17,6 @@ DHT22Sensor dht22(PIN_DHT22);
 WebServer server(80);
 
 bool servidorActivo     = false;
-#if defined(SENSOR_BME280)
-bool estadoAlerta       = true;
-#endif
 bool redLista           = false;
 unsigned long ultimoAvisoIP = 0;
 
@@ -46,19 +43,6 @@ void agregarMetrica(String& out, const char* nombre, const char* ayuda, float va
   out += String(valor, 2);
   out += '\n';
 }
-
-#if defined(SENSOR_BME280)
-void verificarAlertas() {
-  if (!bme.isValid()) {
-    estadoAlerta = true;
-    return;
-  }
-  estadoAlerta =
-    bme.temperature() > ALERTA_TEMP_MAX || bme.temperature() < ALERTA_TEMP_MIN ||
-    bme.humidity()    > ALERTA_HUM_MAX  || bme.humidity()    < ALERTA_HUM_MIN  ||
-    bme.pressureHpa() > ALERTA_PRESION_MAX || bme.pressureHpa() < ALERTA_PRESION_MIN;
-}
-#endif
 
 void handleRoot() {
   String html;
@@ -108,17 +92,17 @@ void handleRoot() {
 
 #if defined(SENSOR_BME280)
   html += F("<p style='font-size:1.2em;background:");
-  html += estadoAlerta ? "#e74c3c" : "#27ae60";
+  html += bme.isValid() ? "#27ae60" : "#e74c3c";
   html += F(";color:white;padding:10px;border-radius:6px'><b>");
-  html += !bme.isValid() ? "SENSOR SIN LECTURA" : (estadoAlerta ? "ALERTA" : "Normal");
+  html += bme.isValid() ? "Lectura valida" : "SENSOR SIN LECTURA";
   html += F("</b></p>");
 #endif
 
+  html += F("<p><small>Valores sin calibrar. Las alertas se revisan en Prometheus.</small></p>");
   html += F("<p><a href='/metrics'>Metricas Prometheus</a></p>");
-
   html += F("</body></html>");
-
   server.send(200, "text/html; charset=utf-8", html);
+
 }
 
 void handleData() {
@@ -164,8 +148,6 @@ void handleMetrics() {
     agregarMetrica(out, "bme280_humedad_porcentaje", "Humedad relativa medida por el BME280.", bme.humidity());
     agregarMetrica(out, "bme280_presion_hpa", "Presion atmosferica medida por el BME280.", bme.pressureHpa());
   }
-  agregarMetrica(out, "bme280_alert_active",
-    "Si alguna lectura del BME280 esta fuera de los umbrales configurados.", estadoAlerta ? 1 : 0);
   agregarMetrica(out, "bme280_wifi_rssi_dbm", "Intensidad de la senal WiFi del nodo.", WiFi.RSSI());
   agregarMetrica(out, "bme280_errores_total",
     "Lecturas invalidas del BME280 acumuladas desde que arranco el nodo.", bme.errorCount());
@@ -209,11 +191,11 @@ void guardarEnBuffer() {
   ultimoGuardado = ahora;
 
   if (!horaValida()) {
-    Serial.println("[Buffer] Hora no sincronizada todavia (sin WiFi desde el arranque); se omite esta lectura");
+    Serial.println("[Buffer] Hora no sincronizada todavia");
     return;
   }
   if (lineasEnBuffer >= BUFFER_MAX_LECTURAS) {
-    return;  // tope de seguridad 30 dias
+    return; 
   }
 
   bool hayDatoValido = false;
@@ -305,7 +287,7 @@ void avisarIPPeriodico() {
                   WiFi.localIP().toString() + ":80/metrics");
 }
 
-// Reinicia el nodo si el heap libre cae demasiado
+// reinicia el nodo si el heap libre cae demasiado
 void vigilarMemoria() {
   static unsigned long ultimoAviso = 0;
   const unsigned long ahora = millis();
@@ -322,7 +304,6 @@ void vigilarMemoria() {
   Serial.printf("[Memoria] Heap libre: %u bytes\n", heapLibre);
 }
 
-// Diagnostico: lista las redes 2.4GHz visibles y si WIFI_SSID esta entre ellas.
 void escanearRedes() {
   Serial.println("[WiFi] Redes visibles...");
   int n = WiFi.scanNetworks();
@@ -425,7 +406,6 @@ void loop() {
 
 #if defined(SENSOR_BME280)
   bme.update();
-  verificarAlertas();
 #endif
 #if defined(SENSOR_DHT22)
   dht22.update();

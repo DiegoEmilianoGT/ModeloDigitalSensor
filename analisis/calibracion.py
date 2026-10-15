@@ -11,10 +11,8 @@ def calibrar(df):
     offsets = cargar_offsets()
     df = df.copy()
     for columna in df.columns:
-        _, _, metrica = columna.partition("-_")
-        if metrica in offsets:
-            df[columna] = (df[columna] + offsets[metrica]).round(2)
+        nodo, _, metrica = columna.partition(" -_")
+        offset = offsets.get(nodo, {}).get(metrica, 0.0)
+        if offset:
+            df[columna] = (df[columna] + offset).round(2)
     return df
-
-
-

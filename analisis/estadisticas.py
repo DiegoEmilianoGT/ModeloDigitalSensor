@@ -5,7 +5,7 @@ from calibracion import calibrar
 
 CARPETA_SCRIPT = os.path.dirname(os.path.abspath(__file__))
 RUTA_DATASET = os.path.join(CARPETA_SCRIPT, "datos", "dataset_sensores.csv")
-UMBRALES = {"humedad": 5, "temperatura": 2}
+UMBRALES = {"humedad": 5, "temperatura": 2, "presion": 10}
 DIAS = 30
 
 def cargar_datos():
@@ -32,7 +32,7 @@ def promedio_30_dias(df):
 
 def limpiar_picos(serie, ventana=5, umbral=5.0):
 
-    # Elimina picos de datos basura
+    # elimina picos de datos basura
     
     mediana_movil = serie.rolling(ventana, center=True, min_periods=1).median()
     es_pico = (serie - mediana_movil).abs() > umbral

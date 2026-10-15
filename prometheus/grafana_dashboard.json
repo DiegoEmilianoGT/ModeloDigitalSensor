@@ -5,7 +5,7 @@
   "tags": ["produccion", "sensores", "gemelo-digital"],
   "timezone": "browser",
   "schemaVersion": 39,
-  "version": 2,
+  "version": 3,
   "refresh": "5s",
   "time": { "from": "now-6h", "to": "now" },
   "templating": {
@@ -28,6 +28,7 @@
         "refresh": 2,
         "multi": true,
         "includeAll": true,
+        "allValue": ".*",
         "current": { "text": "All", "value": ["$__all"] },
         "sort": 1
       }
@@ -61,8 +62,8 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "expr": "up{job=~\"bme280|dht22\"}",
-          "legendFormat": "{{job}} ({{instance}})",
+          "expr": "up{job=~\"bme280|dht22\", nodo=~\"$nodo\"}",
+          "legendFormat": "{{nodo}} ({{instance}})",
           "refId": "A"
         }
       ],
@@ -125,15 +126,15 @@
     },
     {
       "id": 5,
-      "title": "Alerta activa (BME280)",
-      "description": "Se activa cuando temperatura, humedad o presion salen de los umbrales configurados en el firmware.",
+      "title": "Alertas activas",
+      "description": "Alertas que Prometheus tiene disparadas ahora en cada nodo (temperatura, humedad, presion o sensor sin lectura), evaluadas sobre los valores calibrados.",
       "type": "stat",
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
       "gridPos": { "h": 4, "w": 6, "x": 12, "y": 4 },
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "expr": "bme280_alert_active{location=~\"$nodo\"}",
+          "expr": "count by (location) (ALERTS{alertstate=\"firing\", alertname!=\"NodoCaido\", location=~\"$nodo\"}) or 0 * max by (location) ({__name__=~\"(bme280|dht22)_sensor_up\", location=~\"$nodo\"})",
           "legendFormat": "{{location}}",
           "refId": "A"
         }
@@ -142,7 +143,7 @@
         "defaults": {
           "mappings": [
             { "type": "value", "options": { "0": { "text": "Normal", "color": "green" } } },
-            { "type": "value", "options": { "1": { "text": "ALERTA", "color": "red" } } }
+            { "type": "range", "options": { "from": 1, "to": null, "result": { "text": "ALERTA", "color": "red" } } }
           ],
           "thresholds": {
             "mode": "absolute",
@@ -190,20 +191,20 @@
     },
     {
       "id": 8,
-      "title": "Temperatura",
+      "title": "Temperatura (calibrada)",
       "type": "gauge",
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
       "gridPos": { "h": 7, "w": 8, "x": 0, "y": 9 },
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "expr": "bme280_temperatura_celsius{location=~\"$nodo\"}",
+          "expr": "bme280_temperatura_celsius_calibrada{location=~\"$nodo\"}",
           "legendFormat": "BME280 {{location}}",
           "refId": "A"
         },
         {
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "expr": "dht22_temperatura_celsius{location=~\"$nodo\"}",
+          "expr": "dht22_temperatura_celsius_calibrada{location=~\"$nodo\"}",
           "legendFormat": "DHT22 {{location}}",
           "refId": "B"
         }
@@ -228,20 +229,20 @@
     },
     {
       "id": 9,
-      "title": "Humedad relativa",
+      "title": "Humedad relativa (calibrada)",
       "type": "gauge",
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
       "gridPos": { "h": 7, "w": 8, "x": 8, "y": 9 },
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "expr": "bme280_humedad_porcentaje{location=~\"$nodo\"}",
+          "expr": "bme280_humedad_porcentaje_calibrada{location=~\"$nodo\"}",
           "legendFormat": "BME280 {{location}}",
           "refId": "A"
         },
         {
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "expr": "dht22_humedad_porcentaje{location=~\"$nodo\"}",
+          "expr": "dht22_humedad_porcentaje_calibrada{location=~\"$nodo\"}",
           "legendFormat": "DHT22 {{location}}",
           "refId": "B"
         }
@@ -306,20 +307,20 @@
     },
     {
       "id": 12,
-      "title": "Temperatura",
+      "title": "Temperatura (calibrada)",
       "type": "timeseries",
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 17 },
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "expr": "bme280_temperatura_celsius{location=~\"$nodo\"}",
+          "expr": "bme280_temperatura_celsius_calibrada{location=~\"$nodo\"}",
           "legendFormat": "BME280 {{location}}",
           "refId": "A"
         },
         {
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "expr": "dht22_temperatura_celsius{location=~\"$nodo\"}",
+          "expr": "dht22_temperatura_celsius_calibrada{location=~\"$nodo\"}",
           "legendFormat": "DHT22 {{location}}",
           "refId": "B"
         }
@@ -342,20 +343,20 @@
     },
     {
       "id": 13,
-      "title": "Humedad relativa",
+      "title": "Humedad relativa (calibrada)",
       "type": "timeseries",
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 17 },
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "expr": "bme280_humedad_porcentaje{location=~\"$nodo\"}",
+          "expr": "bme280_humedad_porcentaje_calibrada{location=~\"$nodo\"}",
           "legendFormat": "BME280 {{location}}",
           "refId": "A"
         },
         {
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "expr": "dht22_humedad_porcentaje{location=~\"$nodo\"}",
+          "expr": "dht22_humedad_porcentaje_calibrada{location=~\"$nodo\"}",
           "legendFormat": "DHT22 {{location}}",
           "refId": "B"
         }

@@ -10,7 +10,6 @@ telegram-bot/usuarios.json
 .DS_Store
 analisis/datos/
 analisis/resultados/
-modelo/resultados/
 analisis/actualizar-dataset.service
 analisis/actualizar-dataset.timer
 prometheus/targets/

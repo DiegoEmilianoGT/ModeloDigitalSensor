@@ -16,8 +16,8 @@ except ImportError:
 from config import GRAFICAS, RANGOS, log
 from prometheus_api import ERRORES_PROM, prom_get
 from telegram_api import TECLADO_GRAFICAS, enviar_archivo, enviar_mensaje
-from texto import acortar, bloque
-from calibracion import calibrar
+from texto import acortar, bloque, sensor_extra
+from calibracion import calibrar, cargar_offsets
 
 MENSAJE_GRAFICAS = "<b>Graficas</b>\nElige que medir y cuanto tiempo"
 
@@ -31,6 +31,7 @@ def generar_grafica(clave, rango):
     if not series:
         return None, []
 
+    offsets = cargar_offsets()
     fig, ax = plt.subplots(figsize=(9, 4.5), dpi=110)
     try:
         resumen = []
@@ -38,16 +39,17 @@ def generar_grafica(clave, rango):
             xs, ys, previo = [], [], None
 
             metrica = s["metric"]["__name__"]
-            
-            for t, v in s["values"]:
-                t = float(t)
+            ubicacion = s["metric"].get("location", "?")
+
+            for marca, v in s["values"]:
+                t = float(marca)
                 if previo is not None and t - previo > 4 * paso:
                     xs.append(datetime.fromtimestamp(previo + paso))
                     ys.append(float("nan"))  # corta si el nodo no reporta
                 xs.append(datetime.fromtimestamp(t))
-                ys.append(calibrar(metrica, float(v)))
+                ys.append(calibrar(offsets, ubicacion, metrica, float(v)))
                 previo = t
-            etiqueta = acortar(s["metric"].get("location", "?"))
+            etiqueta = acortar(ubicacion) + sensor_extra(ubicacion, metrica)
             ax.plot(xs, ys, label=etiqueta, linewidth=1.6)
             validos = [y for y in ys if y == y]
             if validos:
@@ -79,7 +81,7 @@ def enviar_grafica(chat_id, clave, rango):
         png, resumen = generar_grafica(clave, rango)
     except ERRORES_PROM as exc:
         log.warning("No se pudo generar la grafica: %s", exc)
-        enviar_mensaje(chat_id, "No se pudo generar la grafica (Prometheus no respondio).")
+        enviar_mensaje(chat_id, "No se pudo generar la grafica.")
         return
     if png is None:
         enviar_mensaje(chat_id, "Sin datos para ese rango.")

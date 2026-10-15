@@ -1,28 +1,31 @@
 groups:
   - name: nodos
     rules:
-      # El nodo dejo de responder (BME280 o DHT22)
+      #  nodo no responde
       - alert: NodoCaido
         expr: up{job=~"bme280|dht22"} == 0
         for: 2m
         labels:
           severity: critical
         annotations:
-          resumen: "El nodo {{ $labels.job }} ({{ $labels.instance }}) no responde"
+          resumen: "El nodo {{ $labels.nodo }} ({{ $labels.instance }}) no responde"
 
-      # El nodo responde pero el sensor no entrega lecturas
+      # el nodo responde pero el sensor no entrega lecturas
       - alert: SensorSinLectura
-        expr: bme280_sensor_up == 0 or dht22_sensor_up == 0
+        expr: |-
+          label_replace(bme280_sensor_up, "sensor", "bme280", "", "") == 0
+          or label_replace(dht22_sensor_up, "sensor", "dht22", "", "") == 0
         for: 2m
         labels:
           severity: warning
         annotations:
           resumen: "El sensor no entrega lecturas validas"
 
-      # Umbrales: mismos valores que ALERTA_
-     
+      # umbrales sobre los valores calibrados 
       - alert: TemperaturaAlta
-        expr: bme280_temperatura_celsius_calibrada > 30 or dht22_temperatura_celsius_calibrada > 30
+        expr: |-
+          label_replace(bme280_temperatura_celsius_calibrada, "sensor", "bme280", "", "") > 30
+          or label_replace(dht22_temperatura_celsius_calibrada, "sensor", "dht22", "", "") > 30
         for: 1m
         keep_firing_for: 2m
         labels:
@@ -31,7 +34,9 @@ groups:
           resumen: '{{ $value | printf "%.1f" }} °C (maximo 30 °C)'
 
       - alert: TemperaturaBaja
-        expr: bme280_temperatura_celsius_calibrada < 10 or dht22_temperatura_celsius_calibrada < 10
+        expr: |-
+          label_replace(bme280_temperatura_celsius_calibrada, "sensor", "bme280", "", "") < 10
+          or label_replace(dht22_temperatura_celsius_calibrada, "sensor", "dht22", "", "") < 10
         for: 1m
         keep_firing_for: 2m
         labels:
@@ -40,7 +45,9 @@ groups:
           resumen: '{{ $value | printf "%.1f" }} °C (minimo 10 °C)'
 
       - alert: HumedadAlta
-        expr: bme280_humedad_porcentaje_calibrada > 65 or dht22_humedad_porcentaje_calibrada > 65
+        expr: |-
+          label_replace(bme280_humedad_porcentaje_calibrada, "sensor", "bme280", "", "") > 65
+          or label_replace(dht22_humedad_porcentaje_calibrada, "sensor", "dht22", "", "") > 65
         for: 1m
         keep_firing_for: 2m
         labels:
@@ -49,7 +56,9 @@ groups:
           resumen: '{{ $value | printf "%.1f" }} % (maximo 65 %)'
 
       - alert: HumedadBaja
-        expr: bme280_humedad_porcentaje_calibrada < 15 or dht22_humedad_porcentaje_calibrada < 15
+        expr: |-
+          label_replace(bme280_humedad_porcentaje_calibrada, "sensor", "bme280", "", "") < 15
+          or label_replace(dht22_humedad_porcentaje_calibrada, "sensor", "dht22", "", "") < 15
         for: 1m
         keep_firing_for: 2m
         labels:

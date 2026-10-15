@@ -29,13 +29,6 @@
 #define BUFFER_INTERVALO_MS   (60UL*1000UL)
 #define BUFFER_MAX_LECTURAS    28800UL  // 20 dias a 1 lectura/min
 
-// Umbrales de alerta
-#define ALERTA_TEMP_MAX       30.0f
-#define ALERTA_TEMP_MIN       10.0f
-#define ALERTA_HUM_MAX        65.0f
-#define ALERTA_HUM_MIN        15.0f
-#define ALERTA_PRESION_MAX  1050.0f
-#define ALERTA_PRESION_MIN   700.0f
 
 #define BME_TEMP_MIN     -40.0f
 #define BME_TEMP_MAX      85.0f

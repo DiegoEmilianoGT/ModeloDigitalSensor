@@ -11,15 +11,16 @@ def comparar_sensores(df, metrica):
     if len(columnas) < 2:
         raise ValueError(f"No hay suficientes sensores para comparar la métrica '{metrica}'.")
 
-    comunes = df[columnas].dropna()
     resultado = {}
     for columna in columnas:
         otros = [c for c in columnas if c != columna]
-        diferencias = comunes[otros].mean(axis=1)
+        promedio_otros = df[otros].mean(axis=1)
+        comunes = df[columna].notna() & promedio_otros.notna()
+        propio, referencia = df.loc[comunes, columna], promedio_otros[comunes]
         resultado[columna] = {
-            "correlacion": comunes[columna].corr(diferencias),
-            "diferencia_promedio": (comunes[columna] - diferencias).mean(),
-            "puntos_comunes": len(comunes)
+            "correlacion": propio.corr(referencia),
+            "diferencia_promedio": (propio - referencia).mean(),
+            "puntos_comunes": int(comunes.sum())
         }
     return pd.DataFrame(resultado).T
 

@@ -14,6 +14,12 @@ def acortar(texto):
     return NOMBRE_RE.sub(lambda m: f"{m.group(1).upper()} #{int(m.group(2))}", texto)
 
 
+def sensor_extra(ubicacion, metrica):
+    # dice de cual sensor es la lectura
+    sensor = metrica.split("_")[0]
+    return "" if ubicacion.startswith(sensor) else f" {sensor.upper()}"
+
+
 def bloque(titulo, filas):
     ancho = max((len(k) for k, _ in filas), default=0)
     lineas = [titulo] + [f"  {k.ljust(ancho)}  {v}" for k, v in filas]

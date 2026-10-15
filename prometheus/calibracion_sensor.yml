@@ -2,10 +2,16 @@ groups:
   - name: calibracion
     rules:
       - record: bme280_temperatura_celsius_calibrada
-        expr: bme280_temperatura_celsius + 0.0
+        expr: |-
+          bme280_temperatura_celsius + 0
       - record: bme280_humedad_porcentaje_calibrada
-        expr: bme280_humedad_porcentaje + 16.11
+        expr: |-
+          bme280_humedad_porcentaje{location="bme280_esp32c3_01"} + (9.0)
+          or bme280_humedad_porcentaje + 0
       - record: dht22_temperatura_celsius_calibrada
-        expr: dht22_temperatura_celsius + 0.0
+        expr: |-
+          dht22_temperatura_celsius + 0
       - record: dht22_humedad_porcentaje_calibrada
-        expr: dht22_humedad_porcentaje + 3.0
+        expr: |-
+          dht22_humedad_porcentaje{location="dht22_esp32c3_01"} + (-5.0)
+          or dht22_humedad_porcentaje + 0
