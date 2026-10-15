@@ -64,17 +64,17 @@ def nombre_de(persona):
 
 def comando_solicitar(chat_id, persona):
     if tiene_acceso(chat_id):
-        enviar_mensaje(chat_id, "Ya tienes acceso. Escribe /menu para empezar.")
+        enviar_mensaje(chat_id, "Ya tienes acceso.")
         return
     if chat_id in usuarios["pendientes"]:
-        enviar_mensaje(chat_id, "Tu solicitud ya esta pendiente de revision.")
+        enviar_mensaje(chat_id, "Tu solicitud ya esta pendiente.")
         return
     usuarios["pendientes"][chat_id] = {
         "nombre": nombre_de(persona),
         "fecha": datetime.now().astimezone().isoformat(),
     }
     guardar_usuarios(usuarios)
-    enviar_mensaje(chat_id, "Solicitud enviada. Te aviso en cuanto la revisen.")
+    enviar_mensaje(chat_id, "Solicitud enviada.")
     teclado = {"inline_keyboard": [[
         boton("Aprobar", f"acc:aprobar:{chat_id}"),
         boton("Rechazar", f"acc:rechazar:{chat_id}"),
@@ -99,7 +99,7 @@ def resolver_solicitud(admin_id, chat_id, aprobar):
         }
         guardar_usuarios(usuarios)
         actualizar_comandos_de(chat_id)
-        enviar_mensaje(chat_id, "Tu acceso fue aprobado. Escribe /menu para empezar.")
+        enviar_mensaje(chat_id, "Tu acceso fue aprobado.")
         return f"Aprobado: {pendiente['nombre']}"
     guardar_usuarios(usuarios)
     enviar_mensaje(chat_id, "Tu solicitud de acceso fue rechazada.")
@@ -123,11 +123,11 @@ def comando_revocar(chat_id, args):
         enviar_mensaje(chat_id, "No tienes permiso para hacer esto.")
         return
     if not args:
-        enviar_mensaje(chat_id, "Uso: /revocar <ID> (mira los ID con /usuarios)")
+        enviar_mensaje(chat_id, "Uso: /revocar &lt;ID&gt; (mira los ID con /usuarios)")
         return
     objetivo = args[0]
     if usuarios["aprobados"].pop(objetivo, None) is None:
-        enviar_mensaje(chat_id, f"El ID {objetivo} no estaba aprobado.")
+        enviar_mensaje(chat_id, f"El ID {esc(objetivo)} no estaba aprobado.")
         return
     guardar_usuarios(usuarios)
     actualizar_comandos_de(objetivo)

@@ -1,5 +1,3 @@
-#Configuracion: variables de entorno, constantes y textos
-
 import logging
 import os
 import tempfile

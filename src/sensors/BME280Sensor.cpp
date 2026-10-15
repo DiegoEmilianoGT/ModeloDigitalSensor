@@ -6,7 +6,7 @@
 
 bool BME280Sensor::begin() {
   if (!Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL)) {
-    Serial.println("[BME280] Wire.begin() fallo (pines I2C invalidos)");
+    Serial.println("[BME280](pines I2C invalidos)");
     available_ = false;
     valid_ = false;
     return false;
@@ -22,7 +22,7 @@ bool BME280Sensor::begin() {
     available_ = false;
     valid_ = false;
     address_ = 0;
-    Serial.println("[BME280] No se encontro en 0x76 ni en 0x77");
+    Serial.println("[BME280] No se encontro");
     return false;
   }
 

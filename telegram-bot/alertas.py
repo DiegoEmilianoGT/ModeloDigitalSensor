@@ -1,5 +1,3 @@
-# Vigilancia de alertas: las lee de Prometheus
-
 import json
 import re
 import time
@@ -8,7 +6,7 @@ from datetime import datetime
 from config import ALERT_COOLDOWN_SEC, TITULOS, log
 from prometheus_api import ERRORES_PROM, prom_alertas
 from telegram_api import enviar_mensaje
-from texto import SANGRIA, acortar, esc
+from texto import SANGRIA, acortar, esc, sensor_extra
 from usuarios import avisar_a_todos
 
 estado_alertas = {}
@@ -44,9 +42,11 @@ def info_alerta(alerta):
     labels = alerta.get("labels", {})
     notas = alerta.get("annotations", {})
     inicio = parsear_iso(alerta.get("activeAt"))
+    nodo = labels.get("nodo") or labels.get("location") or labels.get("job", "?").upper()
+    sensor = labels.get("sensor")
     return {
         "nombre": labels.get("alertname", "?"),
-        "nodo": acortar(labels.get("nodo") or labels.get("location") or labels.get("job", "?").upper()),
+        "nodo": acortar(nodo) + (sensor_extra(nodo, sensor) if sensor else ""),
         "resumen": notas.get("resumen") or notas.get("summary") or "",
         "desde": hora_local(alerta.get("activeAt")),
         "desde_ts": inicio.timestamp() if inicio else None,
@@ -103,7 +103,7 @@ def revisar_alertas():
         crudas = prom_alertas()
     except ERRORES_PROM as exc:
         log.warning("No se pudo consultar las alertas: %s", exc)
-        return  # Prometheus no respondio
+        return  # no responde prometheus
 
     firing = {clave_alerta(a): info_alerta(a) for a in crudas if a.get("state") == "firing"}
     ahora = time.time()
@@ -127,7 +127,7 @@ def revisar_alertas():
             if info["notificada"]:
                 continue
             if info["nombre"] != "NodoCaido" and ahora - ultimo_aviso.get(clave, 0.0) < ALERT_COOLDOWN_SEC:
-                continue  # caidas de nodo: siempre se avisan
+                continue  # caidas de nodo
             info["notificada"] = True
             ultimo_aviso[clave] = ahora
             nuevas.append(info)
@@ -143,7 +143,7 @@ def revisar_alertas():
 def comando_silenciar(chat_id):
     global alertas_silenciadas
     alertas_silenciadas = True
-    enviar_mensaje(chat_id, "Alertas silenciadas. Los comandos siguen funcionando; usa /activar para reanudarlas.")
+    enviar_mensaje(chat_id, "Alertas silenciadas. Los comandos siguen funcionando")
 
 
 def comando_activar(chat_id):

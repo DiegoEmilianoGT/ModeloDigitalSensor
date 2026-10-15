@@ -3,14 +3,19 @@ import json
 import os
 import requests
 
-from dataset import DIAS, RUTA_SALIDA, cargar_existente, fusionar, guardar_csv, preparar_carpeta
+from dataset import cargar_existente, dataset_bloqueado, fusionar, guardar_csv
 
 CARPETA_SCRIPT = os.path.dirname(os.path.abspath(__file__))
 CARPETA_TARGETS = os.path.join(CARPETA_SCRIPT, "..", "prometheus", "targets")
 
+BME280 = ("bme280_temperatura_celsius", "bme280_humedad_porcentaje", "bme280_presion_hpa")
+DHT22 = ("dht22_temperatura_celsius", "dht22_humedad_porcentaje")
+
+# valores de cada linea del buffer despues del timestamp
 METRICAS_POR_PREFIJO = {
-    "bme280": ("bme280_temperatura_celsius", "bme280_humedad_porcentaje", "bme280_presion_hpa"),
-    "dht22": ("dht22_temperatura_celsius", "dht22_humedad_porcentaje"),
+    "bme280": BME280,
+    "dht22": DHT22,
+    "supermini": BME280 + DHT22,
 }
 
 
@@ -38,7 +43,7 @@ def prefijo_de(nodo):
 
 
 def parsear_buffer(nodo, texto, metricas):
-    filas, columnas = {}, set()
+    filas = {}
     for linea in texto.strip().splitlines():
         partes = linea.split(",")
         if len(partes) != len(metricas) + 1:
@@ -49,38 +54,36 @@ def parsear_buffer(nodo, texto, metricas):
         except ValueError:
             print(f"{nodo}: timestamp invalido, se ignora: {linea!r}")
             continue
-        valores = {}
-        for metrica, valor in zip(metricas, partes[1:]):
-            if valor == "":
-                continue
-            columna = f"{nodo} -_{metrica}"
-            valores[columna] = valor
-            columnas.add(columna)
+        valores = {
+            f"{nodo} -_{metrica}": valor
+            for metrica, valor in zip(metricas, partes[1:])
+            if valor != ""
+        }
         if valores:
             filas[marca] = valores
-    return filas, columnas
+    return filas
 
 
 def recuperar_de(nodo, host):
     prefijo = prefijo_de(nodo)
     if prefijo is None:
         print(f"{nodo}: no se reconoce el tipo de sensor por el nombre, se omite")
-        return {}, set()
+        return {}
 
     try:
         resp = requests.get(f"http://{host}/buffer", timeout=10)
         resp.raise_for_status()
     except requests.RequestException as exc:
         print(f"{nodo} ({host}): no se pudo contactar - {exc}")
-        return {}, set()
+        return {}
 
     if not resp.text.strip():
-        return {}, set()
+        return {}
 
-    filas, columnas = parsear_buffer(nodo, resp.text, METRICAS_POR_PREFIJO[prefijo])
+    filas = parsear_buffer(nodo, resp.text, METRICAS_POR_PREFIJO[prefijo])
     if filas:
         print(f"{nodo} ({host}): {len(filas)} lecturas recuperadas del buffer")
-    return filas, columnas
+    return filas
 
 
 def confirmar(nodo, host):
@@ -88,23 +91,23 @@ def confirmar(nodo, host):
         requests.get(f"http://{host}/buffer/confirmar", timeout=10).raise_for_status()
         print(f"{nodo} ({host}): buffer confirmado y vaciado")
     except requests.RequestException as exc:
-        print(f"{nodo} ({host}): no se pudo confirmar, se reintentara en la proxima corrida ({exc})")
+        print(f"{nodo} ({host}): no se pudo confirmar, se reintentara mas tarde - {exc} ")
 
 
 if __name__ == "__main__":
-    preparar_carpeta()
-    filas, columnas = cargar_existente()
-
+    recuperadas = {}
     pendientes_de_confirmar = []
     for nodo, host in nodos_conocidos():
-        nuevas, columnas_nuevas = recuperar_de(nodo, host)
-        if nuevas:
-            filas, columnas = fusionar(filas, columnas, nuevas, columnas_nuevas, dias=DIAS)
+        filas = recuperar_de(nodo, host)
+        if filas:
+            for marca, valores in filas.items():
+                recuperadas.setdefault(marca, {}).update(valores)
             pendientes_de_confirmar.append((nodo, host))
 
     if not pendientes_de_confirmar:
         print("Ningun nodo tenia datos pendientes en buffer.")
     else:
-        guardar_csv(filas, columnas)
+        with dataset_bloqueado():
+            guardar_csv(fusionar(cargar_existente(), recuperadas))
         for nodo, host in pendientes_de_confirmar:
             confirmar(nodo, host)

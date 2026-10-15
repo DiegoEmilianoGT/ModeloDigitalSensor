@@ -7,64 +7,72 @@ from datetime import datetime
 from config import CSV_DIAS, CSV_METRICAS, CSV_PASO, CSV_VENTANA, ETIQUETAS, log
 from prometheus_api import ERRORES_PROM, prom_get
 from telegram_api import enviar_archivo, enviar_mensaje
-from texto import acortar
-from calibracion import calibrar
+from texto import acortar, sensor_extra
+from calibracion import calibrar, cargar_offsets
 
 RUTA_DATASET_ANALISIS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "analisis", "datos", "dataset_sensores.csv")
+FORMATO_FECHA = "%Y-%m-%d %H:%M:%S"
 
-def leer_recuperadas():
+
+def nombre_columna(ubicacion, metrica):
+    nombre, unidad = ETIQUETAS[metrica]
+    return f"{acortar(ubicacion)}{sensor_extra(ubicacion, metrica)} - {nombre} ({unidad})"
+
+
+def leer_recuperadas(desde, offsets):
     if not os.path.exists(RUTA_DATASET_ANALISIS):
         return {}
-    limite =  time.time() - CSV_DIAS * 24 * 3600
+    limite = datetime.fromtimestamp(desde).strftime(FORMATO_FECHA)
     filas = {}
     with open(RUTA_DATASET_ANALISIS, newline="", encoding="utf-8") as archivo:
-        for fila in csv.DictReader(archivo):
-            ts = datetime.strptime(fila["Times"], "%Y-%m-%d %H:%M:%S").timestamp()
-            if ts < limite:
+        lector = csv.reader(archivo)
+        columnas = []
+        for indice, encabezado in enumerate(next(lector, [])):
+            ubicacion, _, metrica = encabezado.partition(" -_")
+            if metrica in CSV_METRICAS:
+                columnas.append((indice, ubicacion, metrica, nombre_columna(ubicacion, metrica)))
+        for fila in lector:
+            if fila[0] < limite:
                 continue
-            for columna, valor in fila.items():
-                if columna == "Times" or valor == "":
-                    continue
-                ubicacion, _, metrica = columna.partition(" -_")
-                if metrica not in CSV_METRICAS:
-                    continue
-                nombre, unidad = ETIQUETAS[metrica]
-                columna_bot = f"{ubicacion} - {nombre} ({unidad})"
-                filas.setdefault(int(ts), {})[columna_bot] = calibrar(metrica, float(valor))
+            marca = int(datetime.strptime(fila[0], FORMATO_FECHA).timestamp())
+            for indice, ubicacion, metrica, columna in columnas:
+                if indice < len(fila) and fila[indice] != "":
+                    filas.setdefault(marca, {})[columna] = calibrar(offsets, ubicacion, metrica, float(fila[indice]))
     return filas
 
 def armar_csv():
+    offsets = cargar_offsets()
     consulta = '{__name__=~"%s"}' % "|".join(CSV_METRICAS)
-    fin = int(time.time())
+    fin = int(time.time()) // CSV_PASO * CSV_PASO
     inicio = fin - CSV_DIAS * 24 * 3600
     filas = {}
-    columnas = set()
 
     for desde in range(inicio, fin, CSV_VENTANA):
         hasta = min(desde + CSV_VENTANA, fin)
         series = prom_get("query_range", timeout=20, query=consulta, start=desde, end=hasta, step=CSV_PASO)["result"]
         for s in series:
             metrica = s["metric"]["__name__"]
-            nombre, unidad = ETIQUETAS[metrica]
-            columna = f"{acortar(s['metric'].get('location', '?'))} - {nombre} ({unidad})"
-            columnas.add(columna)
+            ubicacion = s["metric"].get("location", "?")
+            columna = nombre_columna(ubicacion, metrica)
             for t, v in s["values"]:
-                filas.setdefault(int(t), {})[columna] = calibrar(metrica, float(v))
+                filas.setdefault(int(t), {})[columna] = calibrar(offsets, ubicacion, metrica, float(v))
 
-    for ts, valores in leer_recuperadas().items():
+
+    
+    for ts, valores in leer_recuperadas(inicio, offsets).items():
         destino = filas.setdefault(ts, {})
         for columna, valor in valores.items():
             destino.setdefault(columna, valor)
-        columnas.update(valores.keys())
 
     if not filas:
         return None
 
+    columnas = sorted({columna for valores in filas.values() for columna in valores})
     buffer = io.StringIO()
-    writer = csv.DictWriter(buffer, fieldnames=["Times"] + sorted(columnas), restval="")
+    writer = csv.DictWriter(buffer, fieldnames=["Times"] + columnas, restval="")
     writer.writeheader()
     for ts in sorted(filas):
-        writer.writerow({"Times": datetime.fromtimestamp(ts).strftime("%Y-%m-%d %H:%M:%S"), **filas[ts]})
+        writer.writerow({"Times": datetime.fromtimestamp(ts).strftime(FORMATO_FECHA), **filas[ts]})
     return buffer.getvalue().encode("utf-8-sig")  # Excel "°"
 
 
