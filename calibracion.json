@@ -4,7 +4,7 @@
         "bme280_humedad_porcentaje": 9.0
     },
     "dht22_esp32c3_01": {
-        "dht22_temperatura_celsius": 0.0,
+        "dht22_temperatura_celsius": 1.0,
         "dht22_humedad_porcentaje": -5.0
     }
 }

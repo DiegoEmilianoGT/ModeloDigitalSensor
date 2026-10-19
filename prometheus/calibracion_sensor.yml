@@ -10,7 +10,8 @@ groups:
           or bme280_humedad_porcentaje + 0
       - record: dht22_temperatura_celsius_calibrada
         expr: |-
-          dht22_temperatura_celsius + 0
+          dht22_temperatura_celsius{location="dht22_esp32c3_01"} + (1.0)
+          or dht22_temperatura_celsius + 0
       - record: dht22_humedad_porcentaje_calibrada
         expr: |-
           dht22_humedad_porcentaje{location="dht22_esp32c3_01"} + (-5.0)
