@@ -21,3 +21,5 @@ analisis/recuperar-buffer.service
 analisis/recuperar-buffer.timer
 analisis/analisis.service
 analisis/analisis.timer
+api/.venv/
+api/api-sensores.service
