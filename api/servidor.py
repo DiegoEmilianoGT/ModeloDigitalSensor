@@ -27,7 +27,7 @@ app = FastAPI(
     version = "1.0.0",
     )
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["GET"])
-dd
+
 def prometheus(ruta, **params):
     try:
         resp= requests.get(f"{PROMETHEUS_URL}/api/v1/{ruta}", params=params, timeout=20)
@@ -43,7 +43,7 @@ def fecha(marca):
 
 def validar_nodo(nodo):
     if not NODO_RE.match(nodo):
-        raise HTTPException(400, f"Nombre de nodo invalido")
+        raise HTTPException(400, "Nombre de nodo invalido")
 
 def selector(sufijos,nodo=None):
     filtro = f', location="{nodo}"' if nodo else ""

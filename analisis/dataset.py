@@ -2,6 +2,7 @@ import csv
 import fcntl
 import os
 import time
+import glob
 from contextlib import contextmanager
 from datetime import datetime
 import requests
@@ -26,9 +27,20 @@ CARPETA_DATOS = os.path.join(CARPETA_SCRIPT, "datos")
 RUTA_SALIDA = os.path.join(CARPETA_DATOS, "dataset_sensores.csv")
 CARPETA_HISTORICO = os.path.join(CARPETA_DATOS, "historico")
 RUTA_CANDADO = os.path.join(CARPETA_DATOS, ".dataset.lock")
+CARPETA_BUFFER = os.path.join(CARPETA_DATOS, "buffer")
+
+BME280 = ("bme280_temperatura_celsius", "bme280_humedad_porcentaje", "bme280_presion_hpa")
+DHT22 = ("dht22_temperatura_celsius", "dht22_humedad_porcentaje")
+
+METRICAS_POR_PREFIJO = {
+    "bme280": BME280,
+    "dht22": DHT22,
+    "supermini": BME280 + DHT22
+}
 
 def preparar_carpeta():
     os.makedirs(CARPETA_HISTORICO, exist_ok=True)
+    os.makedirs(CARPETA_BUFFER,exist_ok=True)
 
 
 @contextmanager
@@ -141,6 +153,56 @@ def archivar(filas):
         escribir_csv(ruta, filas_mes)
         print(f"Historico actualizado: {ruta} ({len(filas_mes)} filas)")
 
+def prefijo_de(nodo):
+    for prefijo in METRICAS_POR_PREFIJO:
+        if nodo.startswith(prefijo):
+            return prefijo
+    return None
+
+def parsear_buffer(nodo, texto, metricas):
+    filas = {}
+    for linea in texto.strip().splitlines():
+        partes = linea.split(",")
+        if len(partes) != len(metricas) + 1:
+            print(f"{nodo}: linea con forma rara, se ignora: {linea!r}")
+            continue
+        try:
+            marca = int(partes[0])
+        except ValueError:
+            print(f"{nodo}: timestamp invalido, se ignora: {linea!r}")
+            continue
+        valores = {
+            f"{nodo} -_{metrica}": valor
+            for metrica, valor in zip(metricas, partes[1:])
+            if valor != ""
+        }
+        if valores:
+            filas[marca] = valores
+    return filas
+
+def leer_buffers():
+    filas = {}
+    for ruta in glob.glob(os.path.join(CARPETA_BUFFER, "*.csv")):
+        nodo = os.path.splitext(os.path.basename(ruta))[0]
+        prefijo = prefijo_de(nodo)
+        if prefijo is None:
+            print(f"{nodo}: no se reconoce el tipo de sensor, se omite")
+            continue
+        with open(ruta, encoding="utf-8") as archivo:
+            for marca, valores in parsear_buffer(nodo, archivo.read(),METRICAS_POR_PREFIJO[prefijo]).items():
+                filas.setdefault(marca, {}).update(valores)
+    return filas
+
+def completar(filas, del_buffer, paso = PASO):
+    for marca, valores in del_buffer.items():
+        destino = filas.setdefault(marca - marca % paso, {})
+        for columna, valor in valores.items():
+            destino.setdefault(columna, valor)
+    return filas
+
+def vaciar_buffers():
+    for ruta in glob.glob(os.path.join(CARPETA_BUFFER, "*.csv")):
+        os.remove(ruta)
 
 def guardar_csv(filas, dias=DIAS):
     if not filas:
@@ -159,4 +221,6 @@ def guardar_csv(filas, dias=DIAS):
 if __name__ == "__main__":
     nuevas = pedir_datos()
     with dataset_bloqueado():
-        guardar_csv(fusionar(cargar_existente(), nuevas))
+        filas = fusionar(cargar_existente(), nuevas)
+        guardar_csv(completar(filas, leer_buffers()))
+        vaciar_buffers()

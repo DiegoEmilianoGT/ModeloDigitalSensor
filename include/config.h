@@ -15,6 +15,9 @@
 #define I2C_FRECUENCIA_HZ  100000UL
 
 #define PIN_DHT22 4
+#define PIN_LED_ALERTA 10
+#define LED_SIN_NOTICIAS_MS (5UL*60UL*1000UL)
+#define LED_PARPADEO_MS 1000UL
 #define WIFI_TIMEOUT_MS       20000UL       
 #define WIFI_REINTENTO_MS     30000UL       
 #define WIFI_REINICIO_MS  (2UL*3600000UL)
@@ -25,9 +28,10 @@
 #define DHT22_INTERVALO_MS 3000UL
 
 #define HEAP_MINIMO_BYTES 20000UL
-#define BUFFER_ARCHIVO        "/buffer.csv"
-#define BUFFER_INTERVALO_MS   (60UL*1000UL)
-#define BUFFER_MAX_LECTURAS    28800UL  // 20 dias a 1 lectura/min
+#define BUFFER_DIR "/buffer"
+#define BUFFER_INTERVALO_MS (60UL * 1000UL)
+#define BUFFER_DIAS 14
+#define BUFFER_USO_MAXIMO 0.85f
 
 
 #define BME_TEMP_MIN     -40.0f

@@ -3,7 +3,8 @@ groups:
     rules:
       - record: bme280_temperatura_celsius_calibrada
         expr: |-
-          bme280_temperatura_celsius + 0
+          bme280_temperatura_celsius{location="bme280_esp32c3_01"} + (9.0)
+          or bme280_temperatura_celsius + 0
       - record: bme280_humedad_porcentaje_calibrada
         expr: |-
           bme280_humedad_porcentaje{location="bme280_esp32c3_01"} + (9.0)

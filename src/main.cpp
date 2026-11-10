@@ -3,6 +3,8 @@
 #include <WebServer.h>
 #include <LittleFS.h>
 #include <time.h>
+#include <vector>
+#include <algorithm>
 #include "config.h"
 #include "secrets.h"
 #if defined(SENSOR_BME280)
@@ -24,7 +26,39 @@ unsigned long ultimoAvisoIP = 0;
 
 unsigned long ultimoIntentoWiFi  = 0;
 unsigned long inicioDesconexion  = 0;
-uint32_t      lineasEnBuffer     = 0;
+bool alertaLed = false;
+unsigned long ultimaOrdenLed = 0;
+
+void actualizarLed(){
+  const unsigned long ahora = millis();
+  bool encendido = alertaLed;
+
+  if (ahora - ultimaOrdenLed > LED_SIN_NOTICIAS_MS) {
+    encendido = (ahora / LED_PARPADEO_MS) % 2 == 0;
+  }
+  
+  digitalWrite(PIN_LED_ALERTA, encendido ? HIGH : LOW);
+}
+
+void handleLedEstado(){
+  String json = "{\"alerta\":";
+  json += alertaLed ? "true" : "false";
+  json += ",\"sin_noticias\":";
+  json += (millis() - ultimaOrdenLed > LED_SIN_NOTICIAS_MS) ? "true" : "false";
+  json += "}";
+  server.send(200, "application/json", json);
+}
+
+void handleLedCambiar(){
+  const String estado = server.arg("estado");
+  if (estado != "0" && estado != "1"){
+    server.send(400, "text/plain", "Parametro 'estado' invalido");
+    return;
+  }
+  alertaLed = estado == "1";
+  ultimaOrdenLed = millis();
+  handleLedEstado();
+}
 
 void iniciarServidor();
 
@@ -174,79 +208,126 @@ bool horaValida() {
   return time(nullptr) > 1700000000;
 }
 
-void contarLineasBuffer() {
-  lineasEnBuffer = 0;
-  File f = LittleFS.open(BUFFER_ARCHIVO, "r");
-  if (!f) return;
-  while (f.available()) {
-    if (f.read() == '\n') lineasEnBuffer++;
-  }
-  f.close();
+String nombreDelDia(time_t t) {
+  struct tm fecha;
+  gmtime_r(&t, &fecha);
+  char nombre[16];
+  strftime(nombre, sizeof(nombre), "%Y%m%d.csv", &fecha);
+  return String(nombre);
 }
 
-void guardarEnBuffer() {
+String rutaDe (const String& nombre){
+  return String (BUFFER_DIR) + "/" + nombre;
+}
+
+std::vector<String> archivosDelBuffer(){
+  std::vector<String> nombres;
+  File dir = LittleFS.open(BUFFER_DIR);
+  if (!dir || !dir.isDirectory()) return nombres;
+  for (File f = dir.openNextFile(); f; f = dir.openNextFile()){
+    String nombre = f.name();
+    nombres.push_back(nombre.substring(nombre.lastIndexOf('/') + 1));
+    f.close();
+  }
+  std::sort(nombres.begin(), nombres.end());
+  return nombres;
+}
+
+void limpiarBuffer(){
+  const String limite = nombreDelDia(time(nullptr) - (time_t)BUFFER_DIAS * 86400);
+  std::vector<String> nombres = archivosDelBuffer();
+  size_t i = 0;
+  while(i < nombres.size() && nombres[i] < limite) {
+    LittleFS.remove(rutaDe(nombres[i]));
+    Serial.println("[Buffer] Borrado por antiguedad: " + nombres[i]);
+    i++;
+  }
+  while (i + 1 < nombres.size() && LittleFS.usedBytes() > LittleFS.totalBytes() * BUFFER_USO_MAXIMO) {
+    LittleFS.remove(rutaDe(nombres[i]));
+    Serial.println("[Buffer] Memoria casi llena, borrado: " + nombres[i]);
+    i++;
+  }
+}
+
+void guardarEnBuffer(){
   static unsigned long ultimoGuardado = 0;
+  static String diaActual;
   const unsigned long ahora = millis();
   if (ultimoGuardado != 0 && ahora - ultimoGuardado < BUFFER_INTERVALO_MS) return;
   ultimoGuardado = ahora;
 
-  if (!horaValida()) {
+  if(!horaValida()){
     Serial.println("[Buffer] Hora no sincronizada todavia");
     return;
   }
-  if (lineasEnBuffer >= BUFFER_MAX_LECTURAS) {
-    return; 
-  }
 
   bool hayDatoValido = false;
-  String linea = String((unsigned long)time(nullptr));
+  const time_t marca = time(nullptr);
+  String linea = String((unsigned long)marca);
 
-#if defined(SENSOR_BME280)
-  if (bme.isValid()) {
-    linea += "," + String(bme.temperature(), 2) + "," + String(bme.humidity(), 2) + "," + String(bme.pressureHpa(), 2);
-    hayDatoValido = true;
-  } else {
-    linea += ",,,";
-  }
-#endif
-#if defined(SENSOR_DHT22)
-  if (dht22.isValid()) {
-    linea += "," + String(dht22.temperature(), 2) + "," + String(dht22.humidity(), 2);
-    hayDatoValido = true;
-  } else {
-    linea += ",,";
-  }
-#endif
+  
+  #if defined(SENSOR_BME280)
+    if (bme.isValid()){
+      linea += "," + String(bme.temperature(), 2) + "," + String(bme.humidity(), 2) + "," + String(bme.pressureHpa(), 2);
+      hayDatoValido = true;
+    }else {
+      linea += ",,,";
+    }
+  #endif
+  #if defined(SENSOR_DHT22)
+    if (dht22.isValid()) {
+      linea += "," + String(dht22.temperature(), 2) + "," + String(dht22.humidity(), 2);
+      hayDatoValido = true;
+    } else {
+      linea += ",,";
+    }
+  #endif
 
-  if (!hayDatoValido) return; 
+    if (!hayDatoValido) return;
 
-  File f = LittleFS.open(BUFFER_ARCHIVO, "a");
-  if (!f) {
-    Serial.println("[Buffer] No se pudo abrir el archivo para escribir");
-    return;
-  }
-  f.println(linea);
-  f.close();
-  lineasEnBuffer++;
-  Serial.printf("[Buffer] Lectura guardada (%u en total)\n", lineasEnBuffer);
+    const String nombre = nombreDelDia(marca);
+    if (nombre != diaActual) {  // primera lectura del dia: buen momento para limpiar
+      diaActual = nombre;
+      limpiarBuffer();
+    }
+
+    File f = LittleFS.open(rutaDe(nombre), "a");
+    if (!f){
+      Serial.println("[Buffer] No se pudo abrir el archivo");
+      return;
+    }
+    f.println(linea);
+    f.close();
+    Serial.println("[Buffer] Lectura guardada en " + nombre);
 }
 
-void handleBuffer() {
+void handleBuffer(){
   server.sendHeader("Access-Control-Allow-Origin", "*");
-  File f = LittleFS.open(BUFFER_ARCHIVO, "r");
-  if (!f) {
-    server.send(200, "text/csv", "");
-    return;
-  }
-  server.streamFile(f, "text/csv");
-  f.close();
-}
+  const unsigned long desde = strtoul(server.arg("desde").c_str(), nullptr, 10);
+  const String primerDia = nombreDelDia((time_t)desde);
 
-void handleBufferConfirmar() {
-  LittleFS.remove(BUFFER_ARCHIVO);
-  lineasEnBuffer = 0;
-  Serial.println("[Buffer] Confirmado: buffer vaciado");
-  server.send(200, "text/plain", "ok\n");
+  server.setContentLength(CONTENT_LENGTH_UNKNOWN);
+  server.send(200, "text/csv", "");
+  String bloque;
+  bloque.reserve(1100);
+  for(const String& nombre : archivosDelBuffer()){
+    if (nombre < primerDia) continue;
+    File f = LittleFS.open(rutaDe(nombre), "r");
+    while (f && f.available()){
+      String linea = f.readStringUntil('\n');
+      linea.trim();
+      if (linea.isEmpty() || strtoul(linea.c_str(), nullptr, 10) <= desde) continue;
+      bloque += linea;
+      bloque += '\n';
+      if(bloque.length() >= 1024){
+        server.sendContent(bloque);
+        bloque = "";
+      }
+    }
+    f.close();
+  }
+  if (bloque.length() > 0) server.sendContent(bloque);
+  server.sendContent("");
 }
 
 void iniciarServidor() {
@@ -255,7 +336,8 @@ void iniciarServidor() {
   server.on("/data", handleData);
   server.on("/metrics", handleMetrics);
   server.on("/buffer", handleBuffer);
-  server.on("/buffer/confirmar", handleBufferConfirmar);
+  server.on("/led", HTTP_GET, handleLedEstado);
+  server.on("/led", HTTP_POST, handleLedCambiar);
   server.onNotFound([]() {
     server.send(404, "text/plain", "Ruta no encontrada\n");
   });
@@ -375,11 +457,15 @@ void setup() {
 
   Serial.printf("=== Nodo %s ===\n", NODO_ID);
 
+  pinMode(PIN_LED_ALERTA,OUTPUT);
+  digitalWrite(PIN_LED_ALERTA,LOW);
+  ultimaOrdenLed = millis();
+
   if (!LittleFS.begin(true)) {
     Serial.println("[Buffer] No se pudo montar LittleFS");
   }
-  contarLineasBuffer();
-  Serial.printf("[Buffer] Lecturas pendientes de subir: %u\n", lineasEnBuffer);
+  if (!LittleFS.exists(BUFFER_DIR)) LittleFS.mkdir(BUFFER_DIR);
+  Serial.printf("[Buffer] Dias guardados: %u\n", (unsigned)archivosDelBuffer().size());
 
 #if defined(SENSOR_BME280)
   bme.begin();
@@ -403,6 +489,8 @@ void setup() {
 
 void loop() {
   gestionarWiFi();
+  guardarEnBuffer();
+  actualizarLed();
 
 #if defined(SENSOR_BME280)
   bme.update();
@@ -411,13 +499,11 @@ void loop() {
   dht22.update();
 #endif
 
-  if (WiFi.status() == WL_CONNECTED) {
+  if(WiFi.status() == WL_CONNECTED){
     avisarIPPeriodico();
     vigilarMemoria();
     if (!servidorActivo) iniciarServidor();
     server.handleClient();
-  } else {
-    guardarEnBuffer();
   }
 
   delay(2);

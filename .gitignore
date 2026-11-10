@@ -22,3 +22,5 @@ analisis/analisis.service
 analisis/analisis.timer
 api/.venv/
 api/api-sensores.service
+api/requirements.txt
+prometheus/led-alertas.service
