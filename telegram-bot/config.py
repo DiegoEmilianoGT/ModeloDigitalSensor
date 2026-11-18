@@ -1,6 +1,10 @@
 import logging
 import os
+import sys
 import tempfile
+
+# comun/ y modelo/ estan en la raiz del proyecto; este modulo es el primero que importan todos los demas
+sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("telegram-bot")
@@ -11,15 +15,17 @@ BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
 ADMIN_CHAT_IDS = {c.strip() for c in os.environ["TELEGRAM_ALLOWED_CHAT_IDS"].split(",") if c.strip()}
 USUARIOS_PATH = os.environ.get("TELEGRAM_USERS_FILE",
                                 os.path.join(os.path.dirname(os.path.abspath(__file__)), "usuarios.json"))
-PROMETHEUS_URL = os.environ.get("PROMETHEUS_URL", "http://localhost:9090")
 CHECK_INTERVAL_SEC = int(os.environ.get("CHECK_INTERVAL_SEC", "30"))
+ANOMALIAS_INTERVAL_SEC = 300  # el gemelo trabaja con promedios de 10 min: no cambia mas seguido
 ALERT_COOLDOWN_SEC = int(os.environ.get("ALERT_COOLDOWN_SEC", "300"))
 
 ETIQUETAS = {
+    "bme280_sensor_up": ("Sensor", ""),
     "bme280_temperatura_celsius": ("Temperatura", "°C"),
     "bme280_humedad_porcentaje": ("Humedad", "%"),
     "bme280_presion_hpa": ("Presion", "hPa"),
     "bme280_wifi_rssi_dbm": ("RSSI", "dBm"),
+    "dht22_sensor_up": ("Sensor", ""),
     "dht22_temperatura_celsius": ("Temperatura", "°C"),
     "dht22_humedad_porcentaje": ("Humedad", "%"),
     "dht22_wifi_rssi_dbm": ("RSSI", "dBm"),
@@ -30,7 +36,7 @@ GRAFICAS = {
     "hum": ("Hum", "%", '{__name__=~"(bme280|dht22)_humedad_porcentaje"}'),
     "pres": ("Presion", "hPa", "bme280_presion_hpa"),
 }
-RANGOS = {"1h": 3600, "6h": 6 * 3600, "24h": 24 * 3600}
+RANGOS = {"1h": 3600, "6h": 6 * 3600, "24h": 24 * 3600, "7d": 7 * 24 * 3600}
 
 MEDIDAS = {
     "temp": ("temperatura_celsius", "Temperatura", "°C"),
@@ -63,9 +69,10 @@ AYUDA = (
     "/estado - resumen de todos los nodos\n"
     "/alertas - alertas activas\n"
     "/temp /humedad /presion /rssi - lecturas actuales\n"
-    "/grafica temp|hum|pres 1h|6h|24h\n"
+    "/grafica temp|hum|pres 1h|6h|24h|7d\n"
+    "/gemelo - lo medido frente a lo que preveia el modelo\n"
     f"/csv - exporta los ultimos {CSV_DIAS} dias en CSV\n"
-    "/silenciar - pausa los avisos\n"
+    "/silenciar [30m|2h|1d] - pausa los avisos (2 h si no dices cuanto)\n"
     "/activar - reanuda los avisos"
 )
 
@@ -83,6 +90,7 @@ COMANDOS_BOT = [
     ("presion", "Presion actual"),
     ("rssi", "Senal WiFi actual"),
     ("grafica", "Grafica"),
+    ("gemelo", "Medido frente a lo previsto"),
     ("csv", "Exportar CSV"),
     ("silenciar", "Silenciar avisos"),
     ("activar", "Reanudar avisos"),

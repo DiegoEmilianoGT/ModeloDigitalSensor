@@ -1,7 +1,9 @@
 .pio/
 .vscode/
+api/
 __pycache__/
 include/secrets.h
+include/pagina.h
 telegram-bot/.env
 telegram-bot/.env.example
 telegram-bot/usuarios.json
@@ -9,6 +11,8 @@ telegram-bot/usuarios.json
 .DS_Store
 analisis/datos/
 analisis/resultados/
+modelo/resultados/
+modelo/parametros.json
 analisis/actualizar-dataset.service
 analisis/actualizar-dataset.timer
 prometheus/targets/
@@ -20,7 +24,7 @@ analisis/recuperar-buffer.service
 analisis/recuperar-buffer.timer
 analisis/analisis.service
 analisis/analisis.timer
-api/.venv/
-api/api-sensores.service
-api/requirements.txt
+
 prometheus/led-alertas.service
+
+#checar servidor.py sigue en seguimiento de los push y commits 

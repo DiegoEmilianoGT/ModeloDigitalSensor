@@ -1,9 +1,9 @@
 from config import AYUDA, MEDIDAS, SIN_ACCESO, log
 from csv_export import exportar_csv
 from alertas import comando_activar, comando_silenciar, formatear_alertas
-from consultas import formatear_estado, formatear_metrica
+from consultas import formatear_estado, formatear_gemelo, formatear_metrica
 from graficas import MENSAJE_GRAFICAS, enviar_grafica
-from telegram_api import TECLADO_GRAFICAS, TECLADO_MENU, enviar_mensaje, telegram
+from telegram_api import TECLADO_GRAFICAS, TECLADO_MENU, enviar_mensaje, sin_esperar
 from calibracion import comando_calibrar
 from usuarios import (
     comando_revocar,
@@ -21,6 +21,8 @@ def ejecutar(chat_id, accion, args):
         enviar_mensaje(chat_id, formatear_alertas())
     elif accion in MEDIDAS:
         enviar_mensaje(chat_id, formatear_metrica(accion))
+    elif accion == "gemelo":
+        enviar_mensaje(chat_id, formatear_gemelo())
     elif accion in ("grafica", "graficas"):
         if len(args) >= 2:
             enviar_grafica(chat_id, args[0].lower(), args[1].lower())
@@ -31,7 +33,7 @@ def ejecutar(chat_id, accion, args):
     elif accion == "calibrar":
         comando_calibrar(chat_id, args)
     elif accion == "silenciar":
-        comando_silenciar(chat_id)
+        comando_silenciar(chat_id, args)
     elif accion == "activar":
         comando_activar(chat_id)
     elif accion == "usuarios":
@@ -68,10 +70,11 @@ def procesar_update(update):
             _, decision, objetivo = data.split(":", 2)
             log.info("%s resuelve solicitud de %s: %s", chat_id, objetivo, decision)
             texto = resolver_solicitud(chat_id, objetivo, decision == "aprobar")
-            telegram("answerCallbackQuery", json={"callback_query_id": cb["id"], "text": texto})
+            sin_esperar(("answerCallbackQuery", {"callback_query_id": cb["id"], "text": texto}))
             return
 
-        telegram("answerCallbackQuery", json={"callback_query_id": cb["id"]})
+        # el boton deja de girar en segundo plano; la respuesta empieza a prepararse ya
+        sin_esperar(("answerCallbackQuery", {"callback_query_id": cb["id"]}))
         if not tiene_acceso(chat_id):
             log.info("Chat no autorizado: %s", chat_id)
             return

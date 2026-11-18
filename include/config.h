@@ -18,17 +18,24 @@
 #define PIN_LED_ALERTA 10
 #define LED_SIN_NOTICIAS_MS (5UL*60UL*1000UL)
 #define LED_PARPADEO_MS 1000UL
-#define WIFI_TIMEOUT_MS       20000UL       
-#define WIFI_REINTENTO_MS     30000UL       
+#define WIFI_PAUSA_MS          1000UL  // espera entre disconnect() y begin()
+#define WIFI_TIMEOUT_MS       20000UL
+#define WIFI_REINTENTO_MS     30000UL
 #define WIFI_REINICIO_MS  (2UL*3600000UL)
+#define NTP_SERVIDOR_1 "pool.ntp.org"
+#define NTP_SERVIDOR_2 "time.google.com"
 #define LECTURA_INTERVALO_MS   2000UL
 #define REINTENTO_BME_MS      10000UL
 #define ERRORES_PARA_REINICIAR_BME 5
 
 #define DHT22_INTERVALO_MS 3000UL
+#define DHT_TEMP_MIN -40.0f
+#define DHT_TEMP_MAX  80.0f
 
 #define HEAP_MINIMO_BYTES 20000UL
+#define AVISO_IP_INTERVALO_MS 30000UL  // cada cuanto se repiten por serie la IP y la memoria libre
 #define BUFFER_DIR "/buffer"
+#define BUFFER_DUENO "/nodo.txt"
 #define BUFFER_INTERVALO_MS (60UL * 1000UL)
 #define BUFFER_DIAS 14
 #define BUFFER_USO_MAXIMO 0.85f

@@ -25,6 +25,16 @@ def comparar_sensores(df, metrica):
     return pd.DataFrame(resultado).T
 
 
+def comparar_todo(df):
+    comparaciones = {}
+    for metrica in ("humedad", "temperatura"):
+        try:
+            comparaciones[metrica] = comparar_sensores(df, metrica)
+        except ValueError as e:
+            print(e)
+    return pd.concat(comparaciones) if comparaciones else pd.DataFrame()
+
+
 def guardar_resultados(limpieza, resumen, promedios, comparaciones, promedio_30d):
     os.makedirs(CARPETA_RESULTADOS, exist_ok=True)
     limpieza.to_csv(os.path.join(CARPETA_RESULTADOS, "resumen_limpieza.csv"))
@@ -46,10 +56,7 @@ if __name__ == "__main__":
         promedios = promedio_diario(datos)
         promedio_30d = promedio_30_dias(datos)
 
-        comparaciones = pd.concat({
-            "humedad": comparar_sensores(datos, "humedad"),
-            "temperatura": comparar_sensores(datos, "temperatura")
-        })
+        comparaciones = comparar_todo(datos)
 
         print("Resumen de limpieza:")
         print(limpieza)

@@ -1,13 +1,16 @@
 import csv
 import fcntl
 import os
+import sys
 import time
 import glob
 from contextlib import contextmanager
 from datetime import datetime
-import requests
 
-PROMETHEUS_URL = "http://localhost:9090"
+sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+
+from comun import prometheus
+
 DIAS = 30
 PASO = 15
 VENTANA = PASO * 10_000
@@ -53,7 +56,10 @@ def dataset_bloqueado():
 
 
 def pedir_datos():
-    consulta = '{__name__=~"%s"}' % "|".join(METRICAS)
+    # Cada fila lleva la ultima muestra real de sus propios 15 s. Una consulta simple repite el ultimo
+    # valor hasta 5 min cuando Prometheus estuvo apagado (filas inventadas que ademas impedian rellenar
+    # el hueco con el buffer del nodo) y deja vacia la fila si justo fallo la ultima lectura.
+    consulta = 'last_over_time({__name__=~"%s"}[%ds])' % ("|".join(METRICAS), PASO)
     fin = int(time.time()) // PASO * PASO
     inicio = fin - (DIAS * 24 * 3600)
 
@@ -61,21 +67,7 @@ def pedir_datos():
 
     for desde in range(inicio, fin, VENTANA):
         hasta = min(desde + VENTANA, fin)
-        respuesta = requests.get(
-            f"{PROMETHEUS_URL}/api/v1/query_range",
-            params={
-                "query": consulta,
-                "start": desde,
-                "end": hasta,
-                "step": PASO
-            },
-            timeout=60
-        )
-
-        respuesta.raise_for_status()
-        series = respuesta.json()["data"]["result"]
-
-        for serie in series:
+        for serie in prometheus.rango(consulta, desde, hasta, PASO, timeout=60):
             ubicacion = serie["metric"].get("location", "desconocida")
             nombre_metrica = serie["metric"]["__name__"]
             columna = f"{ubicacion} -_{nombre_metrica}"

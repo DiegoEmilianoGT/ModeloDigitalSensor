@@ -1,3 +1,5 @@
+import threading
+
 import requests
 
 from config import BOT_TOKEN, GRAFICAS, RANGOS, log
@@ -23,6 +25,19 @@ def telegram(metodo, timeout=15, **kwargs):
         return None
 
 
+def sin_esperar(*llamadas):
+    # avisos que no deben retrasar la respuesta: cada llamada a Telegram son ~150 ms
+    def hacer():
+        for metodo, cuerpo in llamadas:
+            telegram(metodo, json=cuerpo)
+    threading.Thread(target=hacer, daemon=True).start()
+
+
+def avisar_accion(chat_id, accion):
+    # "enviando foto...", "escribiendo...": lo ve el usuario mientras se prepara la respuesta
+    sin_esperar(("sendChatAction", {"chat_id": chat_id, "action": accion}))
+
+
 def enviar_mensaje(chat_id, texto, teclado=None):
     payload = {
         "chat_id": chat_id,
@@ -35,15 +50,23 @@ def enviar_mensaje(chat_id, texto, teclado=None):
     telegram("sendMessage", json=payload)
 
 
-def enviar_archivo(chat_id, metodo, campo, nombre, contenido, tipo, pie):
-    respuesta = telegram(
+def subir(chat_id, metodo, campo, nombre, contenido, tipo, pie):
+    return telegram(
         metodo,
         timeout=60,
         data={"chat_id": chat_id, "caption": pie, "parse_mode": "HTML"},
         files={campo: (nombre, contenido, tipo)},
     )
-    if respuesta is None:
+
+
+def enviar_archivo(chat_id, metodo, campo, nombre, contenido, tipo, pie):
+    if subir(chat_id, metodo, campo, nombre, contenido, tipo, pie) is None:
         enviar_mensaje(chat_id, "No se pudo enviar el archivo, intenta de nuevo.")
+
+
+def reenviar_foto(chat_id, file_id, pie):
+    # una foto que Telegram ya tiene se manda por su identificador, sin volver a subirla
+    return telegram("sendPhoto", json={"chat_id": chat_id, "photo": file_id, "caption": pie, "parse_mode": "HTML"})
 
 
 def boton(texto, data):
@@ -59,6 +82,6 @@ TECLADO_MENU = {"inline_keyboard": [
     [boton("Estado", "cmd:estado"), boton("Alertas", "cmd:alertas")],
     [boton("Temperatura", "cmd:temp"), boton("Humedad", "cmd:humedad")],
     [boton("Presion", "cmd:presion"), boton("Senal WiFi", "cmd:rssi")],
-    [boton("Graficas", "cmd:grafica")],
+    [boton("Graficas", "cmd:grafica"), boton("Gemelo", "cmd:gemelo")],
     [boton("Silenciar alertas", "cmd:silenciar"), boton("Activar alertas", "cmd:activar")],
 ]}

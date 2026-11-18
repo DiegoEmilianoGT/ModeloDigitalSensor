@@ -1,31 +1,37 @@
+from datetime import datetime
+
 from config import ETIQUETAS, MEDIDAS, log
-from prometheus_api import ERRORES_PROM, prom_query
-from texto import acortar, bloque, sensor_extra
-from calibracion import calibrar, cargar_offsets
+from comun import prometheus as prom
+from comun.calibracion import calibrar, cargar_offsets
+from comun.nombres import acortar, etiqueta, sensor_extra
+from modelo import gemelo
+from texto import bloque, esc
 
 
-def leer_todo():
+def leer(consulta):
+    # una sola consulta trae las lecturas (calibradas) y, si se pide, quien esta en linea
     lecturas, nodos_up = {}, {}
     offsets = cargar_offsets()
     try:
-        for r in prom_query('{__name__=~"(bme280|dht22)_.+"}'):
-            metrica = r["metric"].get("__name__")
-            if metrica in ETIQUETAS:
+        for r in prom.instantanea(consulta):
+            metrica = r["metric"]["__name__"]
+            if metrica == "up":
+                nodos_up[r["metric"].get("nodo") or r["metric"].get("instance", "?")] = float(r["value"][1])
+            else:
                 location = r["metric"].get("location", "desconocido")
                 lecturas.setdefault(location, {})[metrica] = calibrar(offsets, location, metrica, float(r["value"][1]))
-    except ERRORES_PROM as exc:
+    except prom.ERRORES as exc:
         log.warning("No se pudieron consultar las metricas: %s", exc)
-    try:
-        for r in prom_query('up{job=~"bme280|dht22"}'):
-            nodo = r["metric"].get("nodo") or r["metric"].get("instance", "?")
-            nodos_up[nodo] = float(r["value"][1])
-    except ERRORES_PROM as exc:
-        log.warning("No se pudo consultar up: %s", exc)
     return lecturas, nodos_up
 
 
+def con_unidad(valor, unidad):
+    decimales = 0 if unidad == "dBm" else 2  # el RSSI entero
+    return f"{valor:.{decimales}f} {unidad}"
+
+
 def formatear_estado():
-    lecturas, nodos_up = leer_todo()
+    lecturas, nodos_up = leer('{__name__=~"up|%s"}' % "|".join(ETIQUETAS))
     if not lecturas and not nodos_up:
         return "No se pudo contactar a Prometheus."
 
@@ -43,11 +49,11 @@ def formatear_estado():
                 continue
             valor = lecturas[location][metrica]
             if metrica.endswith("_up"):
-                texto = "En linea" if valor == 1 else "SIN RESPUESTA"
-            elif metrica.endswith("_total"):
-                texto = f"{valor:.0f}"
+                if valor == 1:
+                    continue  # se nombra cuando falla, no cuando funciona
+                texto = "SIN LECTURA"
             else:
-                texto = f"{valor:.2f} {unidad}"
+                texto = con_unidad(valor, unidad)
             filas.append((nombre + sensor_extra(location, metrica), texto))
         partes.append(bloque(acortar(location), filas))
     return "\n".join(partes)
@@ -55,13 +61,40 @@ def formatear_estado():
 
 def formatear_metrica(clave):
     sufijo, nombre, unidad = MEDIDAS[clave]
-    lecturas, _ = leer_todo()
+    lecturas, _ = leer('{__name__=~"(bme280|dht22)_%s"}' % sufijo)
     filas = [
-        (acortar(location) + sensor_extra(location, metrica), f"{valor:.2f} {unidad}")
+        (etiqueta(location, metrica), con_unidad(valor, unidad))
         for location, valores in sorted(lecturas.items())
         for metrica, valor in valores.items()
-        if metrica.endswith(sufijo)
     ]
     if not filas:
         return f"Sin datos de {nombre.lower()} por ahora."
     return bloque(nombre, filas)
+
+
+def formatear_gemelo():
+    try:
+        estado = gemelo.calcular()
+    except gemelo.SinModelo:
+        return "El modelo termico todavia no esta entrenado (modelo/entrenar.py)."
+    except prom.ERRORES as exc:
+        log.warning("No se pudo calcular el gemelo: %s", exc)
+        return "No se pudo contactar a Prometheus."
+
+    hora = lambda iso: datetime.fromisoformat(iso).strftime("%H:%M")
+    filas, anomalias = [], []
+    for s in estado["series"]:
+        nombre = etiqueta(s["nodo"], s["sensor"])
+        ultimo = next((p for p in reversed(s["historial"]) if p[1] is not None and p[2] is not None), None)
+        if ultimo is None:
+            filas.append((nombre, "sin datos"))
+        else:
+            _, medido, previsto, tolerancia, _ = ultimo
+            aviso = "  ANOMALIA" if s["estado"] == "anomalia" else ""
+            filas.append((nombre, f"{medido:.1f} °C (previsto {previsto:.1f}, tolerancia ±{tolerancia:.1f}){aviso}"))
+        for e in s["episodios"]:
+            anomalias.append(f"{nombre}: {hora(e['inicio'])}-{hora(e['fin'])} ({e['desviacion']:+.1f} °C)")
+    texto = bloque(f"Medido frente a lo previsto {estado['horizonte_min'] // 60} h antes", filas)
+    if anomalias:
+        return texto + "\nAnomalias en 24 h:\n" + esc("\n".join(anomalias))
+    return texto + "\nSin anomalias en las ultimas 24 h."

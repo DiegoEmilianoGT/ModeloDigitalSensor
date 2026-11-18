@@ -1,23 +1,10 @@
 import html
-import re
 
 from config import BOT_TOKEN
 
 esc = html.escape
 
-NOMBRE_RE = re.compile(r"\b([a-z0-9]+)_[a-z0-9]+_(\d+)\b")
 SANGRIA = " " * 4
-
-
-def acortar(texto):
-    #bme280_esp32c3_01 -> BME280 #1
-    return NOMBRE_RE.sub(lambda m: f"{m.group(1).upper()} #{int(m.group(2))}", texto)
-
-
-def sensor_extra(ubicacion, metrica):
-    # dice de cual sensor es la lectura
-    sensor = metrica.split("_")[0]
-    return "" if ubicacion.startswith(sensor) else f" {sensor.upper()}"
 
 
 def bloque(titulo, filas):

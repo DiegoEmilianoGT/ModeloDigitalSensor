@@ -1,45 +1,29 @@
 import os
 import json
 import math
-import requests
 
-from config import ADMIN_CHAT_IDS, PROMETHEUS_URL, log, MEDIDAS
-from prometheus_api import ERRORES_PROM, prom_query
+from config import ADMIN_CHAT_IDS, log, MEDIDAS
+from comun import prometheus as prom
+from comun.calibracion import RUTA_OFFSETS, cargar_offsets, leer_offsets
+from comun.nombres import etiqueta
 from telegram_api import enviar_mensaje
 from texto import bloque, esc
 
 
-CARPETA_PROYECTO = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
-RUTA_OFFSETS = os.path.join(CARPETA_PROYECTO, "calibracion.json")
-RUTA_REGLAS_PROM = os.path.join(CARPETA_PROYECTO, "prometheus", "calibracion_sensor.yml")
+RUTA_REGLAS_PROM = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "prometheus", "calibracion_sensor.yml")
 SENSORES = ("bme280", "dht22")
 MEDIDAS_CALIBRABLES = ("temp", "humedad")
 METRICAS_CALIBRABLES = [f"{s}_{MEDIDAS[m][0]}" for s in SENSORES for m in MEDIDAS_CALIBRABLES]
+OFFSET_HABITUAL = {"temp": 5.0, "humedad": 20.0}  # mas que esto suele ser un error al escribir
 USO = (
     "/calibrar &lt;nodo&gt; &lt;temp|humedad&gt; &lt;offset&gt;\n\n"
     "/calibrar bme280_esp32c3_00 temp|humedad 00.00\n"
 )
-
-
-def leer_offsets():
-    # nodo{metrica offset}
-    try:
-        with open(RUTA_OFFSETS, encoding="utf-8") as f:
-            return json.load(f)
-    except FileNotFoundError:
-        return {}
-
-
-def cargar_offsets():
-    try:
-        return leer_offsets()
-    except (OSError, ValueError) as exc:
-        log.warning("No se pudo cargar el archivo de offsets: %s", exc)
-        return {}
-
-
-def calibrar(offsets, nodo, metrica, valor):
-    return round(valor + offsets.get(nodo, {}).get(metrica, 0.0), 2)
+AVISO_DESFASE = (
+    "<b>Calibración desfasada</b>\n"
+    "calibracion.json no coincide con las reglas de Prometheus.\n"
+    "Vuelve a aplicar cualquier offset con /calibrar para regenerar las reglas."
+)
 
 
 def generar_reglas(offsets):
@@ -57,6 +41,17 @@ def generar_reglas(offsets):
     return "\n".join(lineas) + "\n"
 
 
+def reglas_al_dia():
+    # las reglas se generan de calibracion.json; los espacios sobrantes (al editar a mano) no cuentan
+    normalizar = lambda texto: [linea.rstrip() for linea in texto.strip().splitlines()]
+    try:
+        with open(RUTA_REGLAS_PROM, encoding="utf-8") as f:
+            return normalizar(f.read()) == normalizar(generar_reglas(leer_offsets()))
+    except (OSError, ValueError) as exc:
+        log.warning("No se pudieron comparar las reglas de calibracion: %s", exc)
+        return True
+
+
 def escribir(ruta, texto):
     temporal = ruta + ".tmp"
     with open(temporal, "w", encoding="utf-8") as f:
@@ -64,22 +59,18 @@ def escribir(ruta, texto):
     os.replace(temporal, ruta)
 
 
-def recargar_prometheus():
-    requests.post(f"{PROMETHEUS_URL}/-/reload", timeout=10).raise_for_status()
-
-
 def aplicar_offsets(offsets):
     with open(RUTA_REGLAS_PROM, encoding="utf-8") as f:
         anteriores = f.read()
     try:
         escribir(RUTA_REGLAS_PROM, generar_reglas(offsets))
-        recargar_prometheus()
+        prom.recargar()
         escribir(RUTA_OFFSETS, json.dumps(offsets, ensure_ascii=False, indent=4) + "\n")
-    except (OSError, requests.RequestException):
+    except OSError:  # incluye los errores de red al recargar
         escribir(RUTA_REGLAS_PROM, anteriores)
         try:
-            recargar_prometheus() 
-        except requests.RequestException as exc:
+            prom.recargar()
+        except OSError as exc:
             log.warning("No se pudo recargar Prometheus con las reglas anteriores: %s", exc)
         raise
 
@@ -87,11 +78,10 @@ def aplicar_offsets(offsets):
 def nodos_y_sensores():
     # nodo: {sensores}
     nodos = {}
-    for sensor in SENSORES:
-        for r in prom_query(f"last_over_time({sensor}_sensor_up[30d])"):
-            nodo = r["metric"].get("location")
-            if nodo:
-                nodos.setdefault(nodo, set()).add(sensor)
+    for r in prom.instantanea('last_over_time({__name__=~"(%s)_sensor_up"}[30d])' % "|".join(SENSORES)):
+        nodo = r["metric"].get("location")
+        if nodo:
+            nodos.setdefault(nodo, set()).add(r["metric"]["__name__"].split("_")[0])
     return nodos
 
 
@@ -109,7 +99,8 @@ def comando_calibrar(chat_id, args):
         enviar_mensaje(chat_id, "No tienes permisos para calibrar sensores.")
         return
     if not args:
-        enviar_mensaje(chat_id, f"{texto_calibracion(cargar_offsets())}\n{USO}")
+        aviso = "" if reglas_al_dia() else f"\n{AVISO_DESFASE}"
+        enviar_mensaje(chat_id, f"{texto_calibracion(cargar_offsets())}\n{USO}{aviso}")
         return
     if len(args) not in (3, 4):
         enviar_mensaje(chat_id, USO)
@@ -137,13 +128,19 @@ def comando_calibrar(chat_id, args):
         nodos = nodos_y_sensores()
         if sensor not in nodos.get(nodo, set()):
             conocidos = ", ".join(f"{n} ({'/'.join(sorted(s))})" for n, s in sorted(nodos.items()))
-            enviar_mensaje(chat_id, esc(f"No hay datos de {sensor} en el nodo {nodo}."))
+            enviar_mensaje(chat_id, esc(
+                f"No hay datos de {sensor} en el nodo {nodo}.\nNodos conocidos: {conocidos or 'ninguno'}"
+            ))
             return
         offsets = leer_offsets()
         offsets.setdefault(nodo, {})[metrica] = offset
         aplicar_offsets(offsets)
-    except (OSError, *ERRORES_PROM) as exc:
+    except (OSError, *prom.ERRORES) as exc:
         enviar_mensaje(chat_id, f"Error al calibrar: {esc(str(exc))}")
         return
     log.info("Calibracion actualizada: %s %s = %+g", nodo, metrica, offset)
-    enviar_mensaje(chat_id, esc(f"Calibración aplicada"))
+    _, nombre, unidad = MEDIDAS[medida]
+    texto = f"Calibración aplicada: {etiqueta(nodo, metrica)}, {nombre.lower()} {offset:+g} {unidad}"
+    if abs(offset) > OFFSET_HABITUAL[medida]:
+        texto += "\nEs un ajuste grande para este sensor: revisa que no sea un error."
+    enviar_mensaje(chat_id, f"{esc(texto)}\n{texto_calibracion(offsets)}")

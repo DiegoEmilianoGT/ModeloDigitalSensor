@@ -5,10 +5,10 @@ import os
 from datetime import datetime
 
 from config import CSV_DIAS, CSV_METRICAS, CSV_PASO, CSV_VENTANA, ETIQUETAS, log
-from prometheus_api import ERRORES_PROM, prom_get
-from telegram_api import enviar_archivo, enviar_mensaje
-from texto import acortar, sensor_extra
-from calibracion import calibrar, cargar_offsets
+from comun import prometheus as prom
+from comun.calibracion import calibrar, cargar_offsets
+from comun.nombres import etiqueta
+from telegram_api import avisar_accion, enviar_archivo, enviar_mensaje
 
 RUTA_DATASET_ANALISIS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "analisis", "datos", "dataset_sensores.csv")
 FORMATO_FECHA = "%Y-%m-%d %H:%M:%S"
@@ -16,7 +16,7 @@ FORMATO_FECHA = "%Y-%m-%d %H:%M:%S"
 
 def nombre_columna(ubicacion, metrica):
     nombre, unidad = ETIQUETAS[metrica]
-    return f"{acortar(ubicacion)}{sensor_extra(ubicacion, metrica)} - {nombre} ({unidad})"
+    return f"{etiqueta(ubicacion, metrica)} - {nombre} ({unidad})"
 
 
 def leer_recuperadas(desde, offsets):
@@ -42,23 +42,23 @@ def leer_recuperadas(desde, offsets):
 
 def armar_csv():
     offsets = cargar_offsets()
-    consulta = '{__name__=~"%s"}' % "|".join(CSV_METRICAS)
+    # la ultima muestra real de cada 15 s, como en analisis/dataset.py: sin last_over_time Prometheus
+    # repite el ultimo valor hasta 5 min cuando un nodo no reporta y esas filas tapan las del buffer
+    consulta = 'last_over_time({__name__=~"%s"}[%ds])' % ("|".join(CSV_METRICAS), CSV_PASO)
     fin = int(time.time()) // CSV_PASO * CSV_PASO
     inicio = fin - CSV_DIAS * 24 * 3600
     filas = {}
 
     for desde in range(inicio, fin, CSV_VENTANA):
         hasta = min(desde + CSV_VENTANA, fin)
-        series = prom_get("query_range", timeout=20, query=consulta, start=desde, end=hasta, step=CSV_PASO)["result"]
-        for s in series:
+        for s in prom.rango(consulta, desde, hasta, CSV_PASO):
             metrica = s["metric"]["__name__"]
             ubicacion = s["metric"].get("location", "?")
             columna = nombre_columna(ubicacion, metrica)
             for t, v in s["values"]:
                 filas.setdefault(int(t), {})[columna] = calibrar(offsets, ubicacion, metrica, float(v))
 
-
-    
+    # lo que el servidor recupero del buffer de los nodos cubre los huecos de Prometheus
     for ts, valores in leer_recuperadas(inicio, offsets).items():
         destino = filas.setdefault(ts, {})
         for columna, valor in valores.items():
@@ -77,10 +77,10 @@ def armar_csv():
 
 
 def exportar_csv(chat_id):
-    enviar_mensaje(chat_id, f"Generando CSV de los ultimos {CSV_DIAS} dias")
+    avisar_accion(chat_id, "upload_document")
     try:
         contenido = armar_csv()
-    except ERRORES_PROM as exc:
+    except prom.ERRORES as exc:
         log.warning("No se pudo generar CSV: %s", exc)
         enviar_mensaje(chat_id, "No se pudo generar el CSV (Prometheus no respondio).")
         return

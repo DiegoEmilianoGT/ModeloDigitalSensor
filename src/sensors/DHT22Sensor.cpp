@@ -19,7 +19,12 @@ void DHT22Sensor::update() {
   const float humedad     = dht_.readHumidity();
   const float temperatura = dht_.readTemperature();
 
-  if (isnan(humedad) || isnan(temperatura)) {
+  const bool datosCoherentes =
+    !isnan(humedad) && !isnan(temperatura) &&
+    temperatura >= DHT_TEMP_MIN && temperatura <= DHT_TEMP_MAX &&
+    humedad     >= 0.0f         && humedad     <= 100.0f;
+
+  if (!datosCoherentes) {
     valid_ = false;
     errorCount_++;
     Serial.println("[DHT22] Lectura invalida");

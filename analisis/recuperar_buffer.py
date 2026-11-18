@@ -1,29 +1,13 @@
-import glob
 import json
 import os
+import time
 import requests
 
 from dataset import CARPETA_BUFFER, dataset_bloqueado
+from comun.nodos import nodos_conocidos
 
-CARPETA_SCRIPT = os.path.dirname(os.path.abspath(__file__))
-CARPETA_TARGETS = os.path.join(CARPETA_SCRIPT, "..", "prometheus", "targets")
 RUTA_ESTADO = os.path.join(CARPETA_BUFFER, "estado.json")
-
-
-def nodos_conocidos():
-    nodos = []
-    for ruta in glob.glob(os.path.join(CARPETA_TARGETS, "*.json")):
-        try:
-            with open(ruta, encoding="utf-8") as f:
-                entradas = json.load(f)
-        except (OSError, json.JSONDecodeError) as exc:
-            print(f"No se pudo leer {ruta}: {exc}")
-            continue
-        for entrada in entradas:
-            host = entrada["targets"][0]
-            nodo = entrada["labels"]["nodo"]
-            nodos.append((nodo, host))
-    return nodos
+ADELANTO_MAXIMO = 24 * 3600  # una marca mas adelantada que esto es basura, no una lectura
 
 
 def cargar_estado():
@@ -53,18 +37,20 @@ def recuperar_de(nodo, host, desde):
     except requests.RequestException as exc:
         print(f"{nodo} ({host}): no se pudo contactar - {exc}")
         return []
+    # sin el tope, una sola marca corrupta en el futuro dejaria al nodo sin recuperar nada mas
+    tope = time.time() + ADELANTO_MAXIMO
     return [
         linea.strip() for linea in resp.text.splitlines()
-        if (marca_de(linea) or 0) > desde
+        if desde < (marca_de(linea) or 0) <= tope
     ]
 
 
 if __name__ == "__main__":
-    with dataset_bloqueado():  
+    with dataset_bloqueado():
         estado = cargar_estado()
 
     nuevas_en_total = 0
-    for nodo, host in nodos_conocidos():
+    for nodo, host in sorted(nodos_conocidos().items()):
         lineas = recuperar_de(nodo, host, estado.get(nodo, 0))
         if not lineas:
             continue

@@ -5,7 +5,7 @@
   "tags": ["produccion", "sensores", "gemelo-digital"],
   "timezone": "browser",
   "schemaVersion": 39,
-  "version": 3,
+  "version": 4,
   "refresh": "5s",
   "time": { "from": "now-6h", "to": "now" },
   "templating": {
@@ -339,6 +339,10 @@
           "custom": { "thresholdsStyle": { "mode": "dashed" } }
         },
         "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "min", "max", "mean"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
       }
     },
     {
@@ -361,7 +365,27 @@
           "refId": "B"
         }
       ],
-      "fieldConfig": { "defaults": { "unit": "percent", "min": 0, "max": 100 }, "overrides": [] }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "green", "value": 15 },
+              { "color": "red", "value": 65 }
+            ]
+          },
+          "custom": { "thresholdsStyle": { "mode": "dashed" } }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "min", "max", "mean"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
     },
     {
       "id": 14,
@@ -377,14 +401,53 @@
           "refId": "A"
         }
       ],
-      "fieldConfig": { "defaults": { "unit": "pressurehpa" }, "overrides": [] }
+      "fieldConfig": { "defaults": { "unit": "pressurehpa" }, "overrides": [] },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "min", "max", "mean"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "id": 20,
+      "title": "Punto de rocio (calculado)",
+      "description": "Temperatura a la que el aire de la sala empezaria a condensar, calculada con la formula de Magnus a partir de temperatura y humedad calibradas. Dos sensores en el mismo aire deben dar casi el mismo punto de rocio aunque midan distinta humedad relativa: si se separan, alguno esta descalibrado.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 25 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "243.12 * (ln(bme280_humedad_porcentaje_calibrada{location=~\"$nodo\"} / 100) + 17.62 * bme280_temperatura_celsius_calibrada{location=~\"$nodo\"} / (243.12 + bme280_temperatura_celsius_calibrada{location=~\"$nodo\"})) / (17.62 - (ln(bme280_humedad_porcentaje_calibrada{location=~\"$nodo\"} / 100) + 17.62 * bme280_temperatura_celsius_calibrada{location=~\"$nodo\"} / (243.12 + bme280_temperatura_celsius_calibrada{location=~\"$nodo\"})))",
+          "legendFormat": "BME280 {{location}}",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "243.12 * (ln(dht22_humedad_porcentaje_calibrada{location=~\"$nodo\"} / 100) + 17.62 * dht22_temperatura_celsius_calibrada{location=~\"$nodo\"} / (243.12 + dht22_temperatura_celsius_calibrada{location=~\"$nodo\"})) / (17.62 - (ln(dht22_humedad_porcentaje_calibrada{location=~\"$nodo\"} / 100) + 17.62 * dht22_temperatura_celsius_calibrada{location=~\"$nodo\"} / (243.12 + dht22_temperatura_celsius_calibrada{location=~\"$nodo\"})))",
+          "legendFormat": "DHT22 {{location}}",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "celsius", "decimals": 1 }, "overrides": [] },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "min", "max", "mean"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "id": 16,
+      "type": "row",
+      "title": "Salud de los nodos",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 33 },
+      "panels": []
     },
     {
       "id": 15,
       "title": "Senal WiFi (RSSI)",
       "type": "timeseries",
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 25 },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 34 },
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
@@ -412,7 +475,82 @@
           "custom": { "thresholdsStyle": { "mode": "dashed" } }
         },
         "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "min", "max", "mean"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
       }
+    },
+    {
+      "id": 19,
+      "title": "Memoria libre (heap)",
+      "description": "Si baja de forma sostenida hay una fuga de memoria; por debajo de 20 KB el nodo se reinicia solo. Requiere el firmware con las metricas nodo_*.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 34 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "nodo_heap_libre_bytes{location=~\"$nodo\"}",
+          "legendFormat": "{{location}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "bytes", "min": 0 }, "overrides": [] },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "min"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "id": 17,
+      "title": "Tiempo encendido",
+      "description": "Tiempo desde el ultimo arranque de cada nodo. Requiere el firmware con las metricas nodo_*.",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 4, "w": 8, "x": 16, "y": 34 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "nodo_uptime_segundos{location=~\"$nodo\"}",
+          "legendFormat": "{{location}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "dtdurations", "decimals": 0 }, "overrides": [] },
+      "options": { "colorMode": "none", "graphMode": "none", "textMode": "value_and_name" }
+    },
+    {
+      "id": 18,
+      "title": "Reinicios en 24 h",
+      "description": "Veces que el nodo arranco en las ultimas 24 horas. Reinicios frecuentes apuntan a alimentacion, WiFi o memoria.",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 4, "w": 8, "x": 16, "y": 38 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "resets(nodo_uptime_segundos{location=~\"$nodo\"}[24h])",
+          "legendFormat": "{{location}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 1 },
+              { "color": "red", "value": 5 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": { "colorMode": "value", "graphMode": "none", "textMode": "value_and_name" }
     }
   ]
 }

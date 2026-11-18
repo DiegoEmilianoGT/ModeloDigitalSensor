@@ -1,14 +1,13 @@
 import os
-import json
+import sys
 
-RUTA_OFFSETS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "calibracion.json")
+sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 
-def cargar_offsets():
-    with open(RUTA_OFFSETS, encoding="utf-8") as f:
-        return json.load(f)
+from comun.calibracion import leer_offsets
+
 
 def calibrar(df):
-    offsets = cargar_offsets()
+    offsets = leer_offsets()
     df = df.copy()
     for columna in df.columns:
         nodo, _, metrica = columna.partition(" -_")

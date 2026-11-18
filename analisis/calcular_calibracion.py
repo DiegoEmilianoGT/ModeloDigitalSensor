@@ -1,11 +1,12 @@
 import csv
+import os
 import statistics
 import sys
 from datetime import datetime
 
-import requests
+sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 
-from dataset import PROMETHEUS_URL
+from comun import prometheus
 
 VENTANA = 120  
 PASO = 15
@@ -28,14 +29,8 @@ def leer_referencia(ruta):
 
 def promedios_nodos(marca):
     
-    respuesta = requests.get(
-        f"{PROMETHEUS_URL}/api/v1/query_range",
-        params={"query": CONSULTA, "start": marca - VENTANA, "end": marca + VENTANA, "step": PASO},
-        timeout=30
-    )
-    respuesta.raise_for_status()
     promedios = {}
-    for serie in respuesta.json()["data"]["result"]:
+    for serie in prometheus.rango(CONSULTA, marca - VENTANA, marca + VENTANA, PASO, timeout=30):
         clave = (serie["metric"].get("location", "?"), serie["metric"]["__name__"])
         promedios[clave] = statistics.mean(float(v) for _, v in serie["values"])
     return promedios
@@ -54,7 +49,7 @@ def comando_bot(nodo, metrica, offset):
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
-        sys.exit(1)
+        sys.exit("Uso: python3 calcular_calibracion.py referencia.csv  (columnas: Times, temperatura, humedad)")
 
     diferencias = {}
     for marca, referencia in leer_referencia(sys.argv[1]):
