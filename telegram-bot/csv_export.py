@@ -42,8 +42,6 @@ def leer_recuperadas(desde, offsets):
 
 def armar_csv():
     offsets = cargar_offsets()
-    # la ultima muestra real de cada 15 s, como en analisis/dataset.py: sin last_over_time Prometheus
-    # repite el ultimo valor hasta 5 min cuando un nodo no reporta y esas filas tapan las del buffer
     consulta = 'last_over_time({__name__=~"%s"}[%ds])' % ("|".join(CSV_METRICAS), CSV_PASO)
     fin = int(time.time()) // CSV_PASO * CSV_PASO
     inicio = fin - CSV_DIAS * 24 * 3600

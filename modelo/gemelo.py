@@ -14,6 +14,8 @@ from comun import prometheus
 from comun.calibracion import cargar_offsets
 from modelo import termico
 
+# apagado por ahora: con True vuelve a funcionar en la API, el panel y el bot
+ACTIVO = False
 RUTA_PARAMETROS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "parametros.json")
 PUNTOS = 144  # se devuelven las ultimas 24 h
 

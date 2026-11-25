@@ -3,6 +3,7 @@ import threading
 import requests
 
 from config import BOT_TOKEN, GRAFICAS, RANGOS, log
+from modelo import gemelo
 from texto import sin_token
 
 API_BASE = f"https://api.telegram.org/bot{BOT_TOKEN}"
@@ -26,7 +27,6 @@ def telegram(metodo, timeout=15, **kwargs):
 
 
 def sin_esperar(*llamadas):
-    # avisos que no deben retrasar la respuesta: cada llamada a Telegram son ~150 ms
     def hacer():
         for metodo, cuerpo in llamadas:
             telegram(metodo, json=cuerpo)
@@ -34,7 +34,6 @@ def sin_esperar(*llamadas):
 
 
 def avisar_accion(chat_id, accion):
-    # "enviando foto...", "escribiendo...": lo ve el usuario mientras se prepara la respuesta
     sin_esperar(("sendChatAction", {"chat_id": chat_id, "action": accion}))
 
 
@@ -65,7 +64,7 @@ def enviar_archivo(chat_id, metodo, campo, nombre, contenido, tipo, pie):
 
 
 def reenviar_foto(chat_id, file_id, pie):
-    # una foto que Telegram ya tiene se manda por su identificador, sin volver a subirla
+    # una foto que Telegram ya tiene se manda por su identificador
     return telegram("sendPhoto", json={"chat_id": chat_id, "photo": file_id, "caption": pie, "parse_mode": "HTML"})
 
 
@@ -82,6 +81,6 @@ TECLADO_MENU = {"inline_keyboard": [
     [boton("Estado", "cmd:estado"), boton("Alertas", "cmd:alertas")],
     [boton("Temperatura", "cmd:temp"), boton("Humedad", "cmd:humedad")],
     [boton("Presion", "cmd:presion"), boton("Senal WiFi", "cmd:rssi")],
-    [boton("Graficas", "cmd:grafica"), boton("Gemelo", "cmd:gemelo")],
+    [boton("Graficas", "cmd:grafica")] + ([boton("Gemelo", "cmd:gemelo")] if gemelo.ACTIVO else []),
     [boton("Silenciar alertas", "cmd:silenciar"), boton("Activar alertas", "cmd:activar")],
 ]}

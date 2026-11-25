@@ -19,7 +19,7 @@ estado_alertas = {}
 ultimo_aviso = {}
 silencio_hasta = 0.0
 alertas_inicializadas = False
-estado_gemelo = None  # (nodo, sensor) -> estado; None hasta la primera revision
+estado_gemelo = None  #none hasta que se hace la primera revision
 
 
 def parsear_iso(iso):
@@ -31,7 +31,6 @@ def parsear_iso(iso):
 
 def hora_de(dt):
     local = dt.astimezone()
-    # una hora de dias anteriores lleva la fecha: sola pareceria de hoy
     es_de_hoy = local.date() == datetime.now().astimezone().date()
     return local.strftime("%H:%M" if es_de_hoy else "%H:%M del %d/%m")
 
@@ -148,7 +147,7 @@ def revisar_alertas():
             if info["notificada"]:
                 continue
             if info["nombre"] != "NodoCaido" and ahora - ultimo_aviso.get(clave, 0.0) < ALERT_COOLDOWN_SEC:
-                continue  # las caidas de nodo se avisan siempre; lo demas espera a que pase la pausa
+                continue  # las caidas de nodo se avisan siempre, lo demas se espera un tiempo
             info["notificada"] = True
             ultimo_aviso[clave] = ahora
             nuevas.append(info)
@@ -185,7 +184,7 @@ def revisar_anomalias():
     anterior = estado_gemelo
     estado_gemelo = {(s["nodo"], s["sensor"]): s["estado"] for s in series}
     if anterior is None or silenciadas():
-        return  # al arrancar solo se toma nota, como con las alertas
+        return  
     partes = []
     for s in series:
         antes = anterior.get((s["nodo"], s["sensor"]))

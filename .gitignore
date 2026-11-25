@@ -24,7 +24,4 @@ analisis/recuperar-buffer.service
 analisis/recuperar-buffer.timer
 analisis/analisis.service
 analisis/analisis.timer
-
 prometheus/led-alertas.service
-
-#checar servidor.py sigue en seguimiento de los push y commits 

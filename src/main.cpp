@@ -9,10 +9,11 @@
 #include "servidor_http.h"
 
 void setup() {
+  setCpuFrequencyMhz(CPU_FRECUENCIA_MHZ);
   Serial.begin(115200);
   delay(1000);
 
-  Serial.printf("=== Nodo %s ===\n", NODO_ID);
+  Serial.printf("=== Nodo %s (%u MHz) ===\n", NODO_ID, (unsigned)getCpuFrequencyMhz());
 
   iniciarLed();
   iniciarBuffer();

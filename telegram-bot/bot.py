@@ -5,6 +5,7 @@ from alertas import revisar_alertas, revisar_anomalias
 from calibracion import AVISO_DESFASE, reglas_al_dia
 from comandos import procesar_update
 from graficas import GRAFICAS_OK, WEBP_OK
+from modelo import gemelo
 from telegram_api import telegram
 from usuarios import avisar_a_admins, registrar_comandos, usuarios
 
@@ -35,7 +36,8 @@ def bucle_principal():
     ultima_alerta = ultima_anomalia = 0.0
     while True:
         ultima_alerta = cada(CHECK_INTERVAL_SEC, revisar_alertas, ultima_alerta)
-        ultima_anomalia = cada(ANOMALIAS_INTERVAL_SEC, revisar_anomalias, ultima_anomalia)
+        if gemelo.ACTIVO:
+            ultima_anomalia = cada(ANOMALIAS_INTERVAL_SEC, revisar_anomalias, ultima_anomalia)
 
         datos = telegram(
             "getUpdates",

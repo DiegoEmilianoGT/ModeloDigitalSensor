@@ -3,8 +3,9 @@ import os
 import sys
 import tempfile
 
-# comun/ y modelo/ estan en la raiz del proyecto; este modulo es el primero que importan todos los demas
 sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+
+from modelo import gemelo
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("telegram-bot")
@@ -16,7 +17,7 @@ ADMIN_CHAT_IDS = {c.strip() for c in os.environ["TELEGRAM_ALLOWED_CHAT_IDS"].spl
 USUARIOS_PATH = os.environ.get("TELEGRAM_USERS_FILE",
                                 os.path.join(os.path.dirname(os.path.abspath(__file__)), "usuarios.json"))
 CHECK_INTERVAL_SEC = int(os.environ.get("CHECK_INTERVAL_SEC", "30"))
-ANOMALIAS_INTERVAL_SEC = 300  # el gemelo trabaja con promedios de 10 min: no cambia mas seguido
+ANOMALIAS_INTERVAL_SEC = 300  
 ALERT_COOLDOWN_SEC = int(os.environ.get("ALERT_COOLDOWN_SEC", "300"))
 
 ETIQUETAS = {
@@ -70,8 +71,8 @@ AYUDA = (
     "/alertas - alertas activas\n"
     "/temp /humedad /presion /rssi - lecturas actuales\n"
     "/grafica temp|hum|pres 1h|6h|24h|7d\n"
-    "/gemelo - lo medido frente a lo que preveia el modelo\n"
-    f"/csv - exporta los ultimos {CSV_DIAS} dias en CSV\n"
+    + ("/gemelo - lo medido frente a lo que preveia el modelo\n" if gemelo.ACTIVO else "")
+    + f"/csv - exporta los ultimos {CSV_DIAS} dias en CSV\n"
     "/silenciar [30m|2h|1d] - pausa los avisos (2 h si no dices cuanto)\n"
     "/activar - reanuda los avisos"
 )
@@ -90,7 +91,7 @@ COMANDOS_BOT = [
     ("presion", "Presion actual"),
     ("rssi", "Senal WiFi actual"),
     ("grafica", "Grafica"),
-    ("gemelo", "Medido frente a lo previsto"),
+    *([("gemelo", "Medido frente a lo previsto")] if gemelo.ACTIVO else []),
     ("csv", "Exportar CSV"),
     ("silenciar", "Silenciar avisos"),
     ("activar", "Reanudar avisos"),

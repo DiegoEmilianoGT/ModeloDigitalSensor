@@ -26,13 +26,13 @@ bool BME280Sensor::begin() {
     return false;
   }
 
+  // modo forzado x1 sin filtro: mide solo cuando se le pide y entre lecturas duerme, sin calentarse
   bme_.setSampling(
-    Adafruit_BME280::MODE_NORMAL,
-    Adafruit_BME280::SAMPLING_X2,
-    Adafruit_BME280::SAMPLING_X16,
+    Adafruit_BME280::MODE_FORCED,
     Adafruit_BME280::SAMPLING_X1,
-    Adafruit_BME280::FILTER_X16,
-    Adafruit_BME280::STANDBY_MS_500
+    Adafruit_BME280::SAMPLING_X1,
+    Adafruit_BME280::SAMPLING_X1,
+    Adafruit_BME280::FILTER_OFF
   );
 
   available_ = true;
@@ -56,9 +56,10 @@ void BME280Sensor::update() {
   if (ahora - lastReadMs_ < LECTURA_INTERVALO_MS) return;
   lastReadMs_ = ahora;
 
-  const float temperatura = bme_.readTemperature();
-  const float humedad     = bme_.readHumidity();
-  const float presionHpa  = bme_.readPressure() / 100.0f;
+  const bool medido = bme_.takeForcedMeasurement();
+  const float temperatura = medido ? bme_.readTemperature() : NAN;
+  const float humedad     = medido ? bme_.readHumidity() : NAN;
+  const float presionHpa  = medido ? bme_.readPressure() / 100.0f : NAN;
 
   const bool datosCoherentes =
     !isnan(temperatura) && !isnan(humedad) && !isnan(presionHpa) &&

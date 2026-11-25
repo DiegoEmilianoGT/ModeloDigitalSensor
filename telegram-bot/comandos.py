@@ -5,6 +5,7 @@ from consultas import formatear_estado, formatear_gemelo, formatear_metrica
 from graficas import MENSAJE_GRAFICAS, enviar_grafica
 from telegram_api import TECLADO_GRAFICAS, TECLADO_MENU, enviar_mensaje, sin_esperar
 from calibracion import comando_calibrar
+from modelo import gemelo
 from usuarios import (
     comando_revocar,
     comando_solicitar,
@@ -21,7 +22,7 @@ def ejecutar(chat_id, accion, args):
         enviar_mensaje(chat_id, formatear_alertas())
     elif accion in MEDIDAS:
         enviar_mensaje(chat_id, formatear_metrica(accion))
-    elif accion == "gemelo":
+    elif accion == "gemelo" and gemelo.ACTIVO:
         enviar_mensaje(chat_id, formatear_gemelo())
     elif accion in ("grafica", "graficas"):
         if len(args) >= 2:

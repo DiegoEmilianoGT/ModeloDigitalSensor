@@ -14,10 +14,10 @@ RUTA_REGLAS_PROM = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 SENSORES = ("bme280", "dht22")
 MEDIDAS_CALIBRABLES = ("temp", "humedad")
 METRICAS_CALIBRABLES = [f"{s}_{MEDIDAS[m][0]}" for s in SENSORES for m in MEDIDAS_CALIBRABLES]
-OFFSET_HABITUAL = {"temp": 5.0, "humedad": 20.0}  # mas que esto suele ser un error al escribir
+OFFSET_HABITUAL = {"temp": 5.0, "humedad": 20.0}
 USO = (
-    "/calibrar &lt;nodo&gt; &lt;temp|humedad&gt; &lt;offset&gt;\n\n"
-    "/calibrar bme280_esp32c3_00 temp|humedad 00.00\n"
+    "/calibrar &lt;nodo&gt; &lt;temp|hum&gt; &lt;offset&gt;\n\n"
+    "/calibrar bme280_esp32c3_00 temp|hum 00.00\n"
 )
 AVISO_DESFASE = (
     "<b>Calibración desfasada</b>\n"
@@ -42,7 +42,7 @@ def generar_reglas(offsets):
 
 
 def reglas_al_dia():
-    # las reglas se generan de calibracion.json; los espacios sobrantes (al editar a mano) no cuentan
+    # las reglas se generan de calibracion.json
     normalizar = lambda texto: [linea.rstrip() for linea in texto.strip().splitlines()]
     try:
         with open(RUTA_REGLAS_PROM, encoding="utf-8") as f:
@@ -66,7 +66,7 @@ def aplicar_offsets(offsets):
         escribir(RUTA_REGLAS_PROM, generar_reglas(offsets))
         prom.recargar()
         escribir(RUTA_OFFSETS, json.dumps(offsets, ensure_ascii=False, indent=4) + "\n")
-    except OSError:  # incluye los errores de red al recargar
+    except OSError:  
         escribir(RUTA_REGLAS_PROM, anteriores)
         try:
             prom.recargar()
@@ -109,6 +109,8 @@ def comando_calibrar(chat_id, args):
     nodo = args[0].lower()
     sensor = args[1].lower() if len(args) == 4 else nodo.split("_")[0]
     medida, texto_offset = args[-2].lower(), args[-1].replace(",", ".")
+    medida = {"hum": "humedad"}.get(medida, medida)  # se acepta la forma corta
+
     if sensor not in SENSORES:
         enviar_mensaje(chat_id, f"Indica el sensor ({' o '.join(SENSORES)}) para el nodo {esc(nodo)}.\n{USO}")
         return

@@ -24,11 +24,12 @@
 #define WIFI_REINICIO_MS  (2UL*3600000UL)
 #define NTP_SERVIDOR_1 "pool.ntp.org"
 #define NTP_SERVIDOR_2 "time.google.com"
-#define LECTURA_INTERVALO_MS   2000UL
+#define CPU_FRECUENCIA_MHZ 80  // a 160 MHz la placa calienta mas al sensor
+#define LECTURA_INTERVALO_MS  15000UL
 #define REINTENTO_BME_MS      10000UL
 #define ERRORES_PARA_REINICIAR_BME 5
 
-#define DHT22_INTERVALO_MS 3000UL
+#define DHT22_INTERVALO_MS 15000UL
 #define DHT_TEMP_MIN -40.0f
 #define DHT_TEMP_MAX  80.0f
 

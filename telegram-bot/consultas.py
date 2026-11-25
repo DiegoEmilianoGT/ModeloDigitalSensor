@@ -9,7 +9,7 @@ from texto import bloque, esc
 
 
 def leer(consulta):
-    # una sola consulta trae las lecturas (calibradas) y, si se pide, quien esta en linea
+    # lecturas (calibradas)
     lecturas, nodos_up = {}, {}
     offsets = cargar_offsets()
     try:
@@ -26,7 +26,7 @@ def leer(consulta):
 
 
 def con_unidad(valor, unidad):
-    decimales = 0 if unidad == "dBm" else 2  # el RSSI entero
+    decimales = 0 if unidad == "dBm" else 2 
     return f"{valor:.{decimales}f} {unidad}"
 
 
@@ -50,7 +50,7 @@ def formatear_estado():
             valor = lecturas[location][metrica]
             if metrica.endswith("_up"):
                 if valor == 1:
-                    continue  # se nombra cuando falla, no cuando funciona
+                    continue 
                 texto = "SIN LECTURA"
             else:
                 texto = con_unidad(valor, unidad)

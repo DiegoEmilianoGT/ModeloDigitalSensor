@@ -193,6 +193,8 @@ def sala():
 @app.get("/api/gemelo")
 def gemelo():
     """Modelo termico en vivo: lo medido en las ultimas 24 h frente a lo que el modelo previo 2 h antes."""
+    if not modelo_gemelo.ACTIVO:
+        raise HTTPException(404, "El gemelo termico esta desactivado")
     try:
         # los datos son promedios de 10 min: no hace falta recalcular en cada visita
         return con_cache("gemelo", 60, modelo_gemelo.calcular)

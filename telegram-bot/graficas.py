@@ -30,8 +30,6 @@ from texto import bloque
 
 MENSAJE_GRAFICAS = "<b>Graficas</b>\nElige que medir y cuanto tiempo"
 
-# (clave, rango) -> (momento, file_id, pie): la misma grafica pedida de nuevo se reenvia sin
-# volver a consultarla, dibujarla ni subirla
 enviadas = {}
 
 
@@ -40,12 +38,10 @@ def paso_de(rango):
 
 
 def vigencia(rango):
-    # mientras no cambie el dato mas reciente la grafica sigue siendo la misma
     return min(max(paso_de(rango), 30), 300)
 
 
 def generar_grafica(clave, rango):
-    """Devuelve (imagen, resumen). La imagen es de Pillow, o PNG ya codificado si no hay Pillow."""
     nombre, unidad, consulta = GRAFICAS[clave]
     fin = time.time()
     paso = paso_de(rango)
@@ -97,18 +93,17 @@ def generar_grafica(clave, rango):
 
 
 def codificar(imagen, formato):
-    if isinstance(imagen, bytes):  # ya es PNG
+    if isinstance(imagen, bytes):
         return imagen
     buf = io.BytesIO()
     if formato == "webp":
-        imagen.save(buf, "WEBP", quality=90, method=4)  # ~30 KB frente a ~80 KB del PNG
+        imagen.save(buf, "WEBP", quality=90, method=4)
     else:
         imagen.save(buf, "PNG")
     return buf.getvalue()
 
 
 def enviar_foto(chat_id, imagen, pie):
-    """Sube la grafica y devuelve el file_id que le dio Telegram, o None si no se pudo."""
     global WEBP_OK
     formatos = ["webp", "png"] if WEBP_OK and not isinstance(imagen, bytes) else ["png"]
     for intento, formato in enumerate(formatos):
@@ -117,7 +112,7 @@ def enviar_foto(chat_id, imagen, pie):
         fotos = (respuesta or {}).get("result", {}).get("photo")
         if not fotos:
             continue
-        if intento:  # Telegram rechazo el WebP y acepto el PNG: no se vuelve a intentar
+        if intento:
             log.warning("Telegram no acepto la grafica en WebP; desde ahora se envia en PNG")
             WEBP_OK = False
         return fotos[-1]["file_id"]
